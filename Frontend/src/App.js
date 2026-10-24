@@ -26,7 +26,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import FreeUserLogin from './free-user/FreeUserLogin';
 import FreeUserRegister from './free-user/FreeUserRegister';
 import FreeUserHome from './free-user/FreeUserHome';
-import { FaCheck, FaTimes, FaWhatsapp, FaPlay, FaFilm, FaLock, FaCheckCircle, FaArrowLeft } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaWhatsapp, FaPlay, FaFilm, FaLock, FaCheckCircle, FaArrowLeft, FaHourglassHalf, FaClock } from 'react-icons/fa';
 import QRCode from 'react-qr-code';
 import API_BASE_URL from './config';
 
@@ -118,18 +118,18 @@ function CreditLimitGuard({ children }) {
   });
 
   useEffect(() => {
-    const isFreeUserActive = !!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData");
-    if (isFreeUserActive) return;
-
     let storedEmail = localStorage.getItem("email") || localStorage.getItem("userEmail") || "";
+    if (!storedEmail) {
+      try {
+        const fData = JSON.parse(localStorage.getItem("freeUserData") || "{}");
+        if (fData.email) storedEmail = fData.email;
+      } catch (e) {}
+    }
     if (!storedEmail) return;
 
-    const apiBase = process.env.REACT_APP_API_URL || "https://goye.onrender.com";
+    const apiBase = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
     const syncLiveStatus = () => {
-      const isFreeUserSession = !!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData");
-      if (isFreeUserSession) return;
-
       // 1. Check if user's subscription was approved live (and still valid!)
       fetch(`${apiBase}/api/user/credits`, {
         method: 'POST',
@@ -149,6 +149,9 @@ function CreditLimitGuard({ children }) {
         );
 
         if (isStillValid) {
+          localStorage.removeItem("freeUserToken");
+          localStorage.removeItem("freeUserData");
+          localStorage.setItem("isLoggedIn", "true");
           localStorage.setItem("isSubscribed", "true");
           localStorage.setItem("credits", "99999");
           if (uData.subscriptionPlan) localStorage.setItem("subscriptionPlan", uData.subscriptionPlan);
@@ -162,6 +165,8 @@ function CreditLimitGuard({ children }) {
           setHasPendingRequest(false);
           localStorage.removeItem(`renewRequested_${storedEmail}`);
           window.dispatchEvent(new Event("creditsChanged"));
+          window.dispatchEvent(new Event("freeUserLoginStatusChanged"));
+          window.dispatchEvent(new Event("loginStatusChanged"));
         } else {
           localStorage.setItem("isSubscribed", "false");
           localStorage.removeItem("subscriptionPlan");
@@ -454,7 +459,7 @@ function CreditLimitGuard({ children }) {
       const planName = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].name) || "One Day";
       const planPrice = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].price) || "₹49";
 
-      const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
+      const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -786,12 +791,12 @@ function CreditLimitGuard({ children }) {
 
       {/* Main Freeze Popup Modal with Blurred Backdrop */}
       {shouldFreezeApp && !effectiveFreezeDismissed && (
-        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 text-center animate-fade-in overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 text-center animate-fade-in overflow-y-auto" style={{ fontFamily: "'Inter', sans-serif" }}>
           {/* Ambient Background Glow (Constrained so it cannot overflow) */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 bg-[#25D366]/15 rounded-full blur-3xl pointer-events-none overflow-hidden" />
           
           {/* Main Freeze Card */}
-          <div className="bg-[#0E1613]/95 border border-[#25D366]/35 rounded-2xl sm:rounded-3xl p-5 sm:p-12 max-w-lg w-full shadow-[0_25px_70px_rgba(0,0,0,0.9)] relative z-10 backdrop-blur-2xl flex flex-col items-center">
+          <div className="bg-[#0E1613]/95 border border-[#25D366]/35 rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-[0_25px_70px_rgba(0,0,0,0.9)] relative z-10 backdrop-blur-2xl flex flex-col items-center my-auto mt-12 sm:my-auto">
             
             {/* Top Right Close Button for voluntary modal view */}
             {(!isExpiredSubscribedUser || isFreeUser) && (
@@ -811,9 +816,21 @@ function CreditLimitGuard({ children }) {
 
             {/* Warning Lock / Status Icon */}
             {isFreshRenewPending ? (
-              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-amber-500/10 border border-amber-500/30 rounded-2xl sm:rounded-3xl flex items-center justify-center text-2xl sm:text-4xl mb-4 sm:mb-6 shadow-inner text-amber-400 animate-pulse">
-                ⏳
-              </div>
+              <>
+                <div className="relative mb-2.5">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-tr from-amber-500/25 via-amber-400/10 to-emerald-500/20 border-2 border-amber-500/40 rounded-2xl sm:rounded-3xl flex items-center justify-center text-2xl sm:text-3xl shadow-[0_0_35px_rgba(245,158,11,0.35)] text-amber-400">
+                    <FaHourglassHalf className="animate-pulse" />
+                  </div>
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+                  </span>
+                </div>
+                <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold uppercase tracking-wider mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                  Review in Progress
+                </div>
+              </>
             ) : isFreeUser && credits > 0 ? (
               <div className="w-14 h-14 sm:w-20 sm:h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl sm:rounded-3xl flex items-center justify-center text-2xl sm:text-4xl mb-4 sm:mb-6 shadow-inner text-emerald-400 animate-pulse">
                 🚀
@@ -828,7 +845,7 @@ function CreditLimitGuard({ children }) {
               </div>
             )}
 
-            <h2 className="text-xl sm:text-3xl font-extrabold text-white mb-2 sm:mb-3 tracking-tight leading-snug">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-2 tracking-tight leading-snug">
               {isFreshRenewPending
                 ? "Plan Request Under Review"
                 : isFreeUser && credits > 0
@@ -847,9 +864,9 @@ function CreditLimitGuard({ children }) {
                         )}
             </h2>
 
-            <p className="text-sm text-white/50 mb-8 font-medium max-w-xs mx-auto text-center">
+            <p className="text-xs sm:text-sm text-white/60 mb-5 font-medium max-w-sm mx-auto text-center leading-relaxed">
               {isFreshRenewPending
-                ? "Your subscription request is currently under review by Admin. Your plan will be activated shortly."
+                ? "Your subscription request has been received and is currently being verified by Admin. Your access will be automatically unlocked once approved."
                 : isFreeUser && credits > 0
                   ? "Upgrade to a Pro Plan for unlimited messaging & premium features, or watch a video to recharge."
                   : isFreeUser
@@ -863,15 +880,39 @@ function CreditLimitGuard({ children }) {
 
             <div className="w-full flex flex-col gap-3.5">
               {isFreshRenewPending ? (
-                <>
-                  {/* Button 1: Plan Requested (Pending Admin Approval) */}
-                  <button
-                    disabled={true}
-                    className="w-full py-4 bg-amber-500/15 border border-amber-500/40 text-amber-300 font-extrabold rounded-2xl text-base flex items-center justify-center gap-2 cursor-not-allowed opacity-90 shadow-[0_4px_20px_rgba(245,158,11,0.2)]"
-                  >
-                    <span>⏳</span> Plan Requested (Waiting for Admin Approval)
-                  </button>
-                </>
+                <div className="w-full flex flex-col gap-3">
+                  {/* Status Progress Card */}
+                  <div className="bg-[#121B16]/95 border border-amber-500/30 rounded-2xl p-4 text-left shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+                    <div className="flex items-center justify-between text-xs font-semibold text-white/70 mb-3 pb-2 border-b border-white/10">
+                      <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                        <FaClock className="text-xs" /> Status Tracker
+                      </span>
+                      <span className="text-amber-300/80 bg-amber-500/10 px-2 py-0.5 rounded-full text-[10px]">Step 2 of 3</span>
+                    </div>
+
+                    {/* Timeline Steps */}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/40 font-bold">
+                          ✓
+                        </div>
+                        <span className="text-white/80 font-medium">Subscription Request Submitted</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/40 animate-pulse font-bold text-[10px]">
+                          ⏳
+                        </div>
+                        <span className="text-amber-300 font-bold">Admin Verification in Progress</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs opacity-50">
+                        <div className="w-5 h-5 rounded-full bg-white/5 text-white/40 flex items-center justify-center shrink-0 border border-white/10 text-[10px]">
+                          3
+                        </div>
+                        <span className="text-white/60 font-medium">Automatic Plan Activation</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ) : isFreeUser ? (
                 <>
                   {/* Free User Primary: Upgrade to Pro Plans (Highlighted First) */}
@@ -1826,12 +1867,6 @@ function CreditLimitGuard({ children }) {
 
                     {activeModalTab === 'payment' && (
                       <div className="p-4 sm:p-8 text-center overflow-y-auto overscroll-contain flex-1 no-scrollbar">
-                        <button 
-                          onClick={() => setActiveModalTab('options')} 
-                          className="text-xs font-bold text-white/50 hover:text-white mb-4 sm:mb-6 flex items-center gap-1.5 transition-colors absolute top-4 left-5"
-                        >
-                          ← Back
-                        </button>
                         <div className="mt-4">
                           <h4 className="text-xl font-bold text-white">Scan & Pay</h4>
                           <p className="text-xs text-white/50 mt-1 max-w-sm mx-auto mb-6">
@@ -1884,13 +1919,6 @@ function CreditLimitGuard({ children }) {
 
                     {activeModalTab === 'request' && (
                       <div className="p-4 sm:p-8 relative overflow-y-auto overscroll-contain flex-1 no-scrollbar">
-                        <button 
-                          onClick={() => setActiveModalTab('options')} 
-                          className="text-xs sm:text-sm font-bold text-white/50 hover:text-white mb-4 sm:mb-6 flex items-center gap-1.5 sm:gap-2 transition-colors absolute top-4 left-5"
-                        >
-                          ← Back
-                        </button>
-                        
                         <div className="text-center mb-8 mt-6">
                           <div className="w-16 h-16 mx-auto bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center text-2xl mb-5 shadow-[0_0_20px_rgba(59,130,246,0.2)] border border-blue-500/20">
                             <FaCheckCircle className="text-2xl" />
@@ -1903,7 +1931,7 @@ function CreditLimitGuard({ children }) {
                           onSubmit={async (e) => {
                             e.preventDefault();
                             try {
-                              const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
+                              const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
                               const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },

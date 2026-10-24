@@ -104,8 +104,8 @@ export default function Login() {
           if (data.subscriptionExpiresAt) localStorage.setItem("subscriptionExpiresAt", data.subscriptionExpiresAt);
           localStorage.setItem("credits", "99999");
           localStorage.removeItem("freeUserToken");
+          localStorage.removeItem("freeUserData");
           localStorage.removeItem(`renewRequested_${email}`);
-          localStorage.removeItem("subscriptionPlan");
         } else {
           localStorage.removeItem("isSubscribed");
           localStorage.removeItem("subscriptionPlan");

@@ -377,7 +377,7 @@ router.get('/free-user/me', requireFreeUserAuth, async (req, res) => {
 // middleware once I see how AdminLogin/AdminSidebar currently work.
 router.get('/admin/free-users', async (req, res) => {
   try {
-    const freeUsers = await FreeUser.find({}, '-passwordHash').sort({ createdAt: -1 }).lean();
+    const freeUsers = await FreeUser.find({}).sort({ createdAt: -1 }).lean();
     return res.status(200).json(freeUsers);
   } catch (error) {
     console.error('❌ Admin free-users list error:', error);

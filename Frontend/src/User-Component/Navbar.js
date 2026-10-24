@@ -97,17 +97,51 @@ export default function Navbar() {
       return;
     }
 
-    // Check for approval notification for this user
-    const approvalNotif = notifications && Array.isArray(notifications) ? notifications.find(
-      n => (
+    // Helper to determine if an approval notification is expired
+    const isApprovalNotifExpired = (notif) => {
+      if (!notif) return true;
+      if (notif.expiresAt) {
+        const exp = new Date(notif.expiresAt).getTime();
+        if (!isNaN(exp) && exp <= Date.now()) return true;
+      }
+      const msg = notif.message || "";
+      const matchExpires = msg.match(/(?:Expires|Valid until):\s*([^\n\r]+)/i);
+      if (matchExpires && matchExpires[1]) {
+        const dateStr = matchExpires[1].replace(/\(.*?\)/g, "").trim();
+        const parsedTime = Date.parse(dateStr);
+        if (!isNaN(parsedTime) && parsedTime <= Date.now()) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Check for active, unread, unexpired approval notification strictly matching this user's email
+    const approvalNotif = notifications && Array.isArray(notifications) ? notifications.find(n => {
+      const emailMatches = (
         (n.userEmail && n.userEmail.toLowerCase().trim() === currentEmail) ||
-        (n.email && n.email.toLowerCase().trim() === currentEmail) ||
-        (!n.userEmail && !n.email)
-      ) && (
-        n.type === 'request_approved' || 
-        (n.title && (n.title.includes('Activated') || n.title.includes('Queued') || n.title.includes('Approved')))
-      )
-    ) : null;
+        (n.email && n.email.toLowerCase().trim() === currentEmail)
+      );
+      if (!emailMatches) return false;
+
+      const isApprovalType = n.type === 'request_approved' || 
+        (n.title && (n.title.includes('Activated') || n.title.includes('Queued') || n.title.includes('Approved')));
+      if (!isApprovalType) return false;
+
+      // Exclude read notifications
+      if (n.read) return false;
+
+      // Exclude expired notifications
+      if (isApprovalNotifExpired(n)) return false;
+
+      // Exclude already dismissed modals
+      const notifKey = n._id || n.requestId || currentEmail;
+      if (localStorage.getItem(`dismissedUpgradeModal_${notifKey}`) === "true") {
+        return false;
+      }
+
+      return true;
+    }) : null;
 
     let freeUserDoc = null;
     try {
@@ -115,11 +149,8 @@ export default function Navbar() {
     } catch (e) {}
 
     const isUpgradedInProfile = !!(
-      freeUserDoc?.isSubscribed || 
-      freeUserDoc?.hasEverSubscribed ||
-      freeUserDoc?.subscriptionPlan ||
-      (freeUserDoc?.subscriptionExpiresAt && new Date(freeUserDoc.subscriptionExpiresAt).getTime() > Date.now()) ||
-      localStorage.getItem("isSubscribed") === "true"
+      (freeUserDoc?.isSubscribed && freeUserDoc?.subscriptionExpiresAt && new Date(freeUserDoc.subscriptionExpiresAt).getTime() > Date.now()) ||
+      (localStorage.getItem("isSubscribed") === "true" && localStorage.getItem("subscriptionExpiresAt") && new Date(localStorage.getItem("subscriptionExpiresAt")).getTime() > Date.now())
     );
 
     // If Free User's plan is approved: FREEZE the app and show the Plan Approved modal!
@@ -135,8 +166,7 @@ export default function Navbar() {
       const unreadNotif = notifications.find(
         n => !n.read && (
           (n.userEmail && n.userEmail.toLowerCase().trim() === currentEmail) ||
-          (n.email && n.email.toLowerCase().trim() === currentEmail) ||
-          (!n.userEmail && !n.email)
+          (n.email && n.email.toLowerCase().trim() === currentEmail)
         )
       );
       if (unreadNotif) {
@@ -161,6 +191,10 @@ export default function Navbar() {
 
   const handleRedirectToSubscriptionLogin = (notif) => {
     const userEmail = (localStorage.getItem("email") || "").trim();
+    const notifKey = notif?._id || notif?.requestId || userEmail.toLowerCase();
+    if (notifKey) {
+      localStorage.setItem(`dismissedUpgradeModal_${notifKey}`, "true");
+    }
     if (typeof markAsRead === 'function') {
       markAsRead();
     }
@@ -212,7 +246,7 @@ export default function Navbar() {
     };
 
     try {
-      const response = await fetch("https://goye.onrender.com/api/support", {
+      const response = await fetch("http://localhost:5000/api/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -282,11 +316,30 @@ export default function Navbar() {
 
   useEffect(() => {
     const updateNavState = () => {
-      const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-      const freeLoggedIn = !!localStorage.getItem("freeUserToken");
+      const isSub = localStorage.getItem("isSubscribed") === "true";
+      const expiresAt = localStorage.getItem("subscriptionExpiresAt");
+      const upcomingExp = localStorage.getItem("upcomingPlanExpiresAt");
+
+      const expTime = (upcomingExp && new Date(upcomingExp).getTime() > (expiresAt ? new Date(expiresAt).getTime() : 0))
+        ? new Date(upcomingExp).getTime()
+        : (expiresAt && expiresAt !== "null" ? new Date(expiresAt).getTime() : 0);
+
+      const isPaidActive = isSub && (expTime === 0 || expTime > Date.now());
+
+      if (isPaidActive) {
+        if (localStorage.getItem("freeUserToken") || localStorage.getItem("freeUserData")) {
+          localStorage.removeItem("freeUserToken");
+          localStorage.removeItem("freeUserData");
+        }
+        setIsLoggedIn(true);
+        setIsFreeUserLoggedIn(false);
+      } else {
+        const loggedIn = localStorage.getItem("isLoggedIn") === "true";
+        const freeLoggedIn = !!localStorage.getItem("freeUserToken");
+        setIsLoggedIn(loggedIn);
+        setIsFreeUserLoggedIn(freeLoggedIn);
+      }
       const stored = localStorage.getItem("credits");
-      setIsLoggedIn(loggedIn);
-      setIsFreeUserLoggedIn(freeLoggedIn);
       setNavCredits(stored !== null ? Math.max(0, parseInt(stored, 10)) : 0);
     };
 
@@ -558,18 +611,27 @@ export default function Navbar() {
   const isAnyUserLoggedIn = isLoggedIn || isFreeUserLoggedIn;
   
   const isSubscriptionActive = () => {
-    // STRICT ISOLATION: A Free User session MUST NEVER be considered an active subscribed user!
+    const isSub = localStorage.getItem("isSubscribed") === "true";
+    const expiresAt = localStorage.getItem("subscriptionExpiresAt");
+    const upcomingExp = localStorage.getItem("upcomingPlanExpiresAt");
+
+    const expTime = (upcomingExp && new Date(upcomingExp).getTime() > (expiresAt ? new Date(expiresAt).getTime() : 0))
+      ? new Date(upcomingExp).getTime()
+      : (expiresAt && expiresAt !== "null" ? new Date(expiresAt).getTime() : 0);
+
+    const isPaidActive = isSub && (expTime === 0 || expTime > Date.now());
+
+    if (isPaidActive) {
+      if (localStorage.getItem("freeUserToken") || localStorage.getItem("freeUserData")) {
+        localStorage.removeItem("freeUserToken");
+        localStorage.removeItem("freeUserData");
+      }
+      return true;
+    }
+
     const isFree = !!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData") || isFreeUserLoggedIn;
     if (isFree) return false;
 
-    const expiresAt = localStorage.getItem("subscriptionExpiresAt");
-    const isSub = localStorage.getItem("isSubscribed") === "true";
-    if (expiresAt && expiresAt !== "null") {
-      const expTime = new Date(expiresAt).getTime();
-      if (!isNaN(expTime)) {
-        return isSub && expTime > Date.now();
-      }
-    }
     return isSub;
   };
 
@@ -1838,8 +1900,8 @@ export default function Navbar() {
       )}
 
       {/* Enhanced Premium Floating Goye AI Assistant Trigger Widget */}
-      {(isLoggedIn || isFreeUserLoggedIn) && !isAdminPage && (
-        <div className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-[100] group flex items-center select-none">
+      {!isAdminPage && (
+        <div className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-[100] group flex items-center select-none pointer-events-none">
           <style>{`
             @keyframes gyAiBreathe {
               0%, 100% { transform: translateY(0px); }
@@ -1861,13 +1923,12 @@ export default function Navbar() {
             }
           `}</style>
 
-          {/* Premium Glassmorphism Label Bubble (Appears smoothly on hover/interaction, hidden by default) */}
+          {/* Premium Glassmorphism Label Bubble (Appears smoothly on hover, strictly non-clickable) */}
           {!botOpen && (
             <div
-              onClick={() => setBotOpen(true)}
-              className="hidden sm:flex items-center mr-3.5 cursor-pointer relative opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto translate-x-3 group-hover:translate-x-0 transition-all duration-300 ease-out"
+              className="hidden sm:flex items-center mr-3.5 relative opacity-0 pointer-events-none group-hover:opacity-100 translate-x-3 group-hover:translate-x-0 transition-all duration-300 ease-out select-none"
             >
-              <div className="relative bg-[#0c1310]/95 backdrop-blur-2xl border border-[#25D366]/40 hover:border-[#25D366]/80 rounded-2xl px-4 py-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.8),0_0_20px_rgba(37,211,102,0.18)] hover:shadow-[0_16px_45px_rgba(0,0,0,0.9),0_0_30px_rgba(37,211,102,0.3)] transition-all duration-300 flex flex-col gap-1 whitespace-nowrap">
+              <div className="relative bg-[#0c1310]/95 backdrop-blur-2xl border border-[#25D366]/40 rounded-2xl px-4 py-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.8),0_0_20px_rgba(37,211,102,0.18)] transition-all duration-300 flex flex-col gap-1 whitespace-nowrap pointer-events-none select-none">
                 {/* Top Subtle Emerald Glow Line */}
                 <div className="absolute top-0 left-4 right-4 h-[1.5px] bg-gradient-to-r from-transparent via-[#25D366]/60 to-transparent pointer-events-none" />
 
@@ -1888,13 +1949,13 @@ export default function Navbar() {
                 </span>
 
                 {/* Seamless Connecting Arrow Pointer */}
-                <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3.5 h-3.5 bg-[#0c1310] border-t border-r border-[#25D366]/40 rotate-45 backdrop-blur-2xl pointer-events-none group-hover:border-[#25D366]/80 transition-colors" />
+                <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3.5 h-3.5 bg-[#0c1310] border-t border-r border-[#25D366]/40 rotate-45 backdrop-blur-2xl pointer-events-none" />
               </div>
             </div>
           )}
 
           {/* Avatar Container with Floating & Soft Ambient Glow */}
-          <div className="relative flex items-center justify-center gy-ai-floating">
+          <div className="relative flex items-center justify-center gy-ai-floating pointer-events-none">
             {/* Cute Floating Sparkle Particles around the Avatar */}
             {!botOpen && (
               <>
@@ -1920,16 +1981,16 @@ export default function Navbar() {
             )}
 
             {/* Soft Ambient Glow behind the avatar */}
-            <div className="absolute -inset-3 sm:-inset-4 rounded-full bg-[#25D366]/30 blur-2xl pointer-events-none transition-all duration-300 ease-out group-hover:bg-[#25D366]/55 group-hover:blur-3xl gy-ai-ambient" />
+            <div className="absolute -inset-3 sm:-inset-4 rounded-full bg-[#25D366]/30 blur-2xl pointer-events-none transition-all duration-300 ease-out gy-ai-ambient" />
 
             {/* Ground Shadow */}
-            <div className="absolute -bottom-2 w-12 sm:w-24 h-3 sm:h-4 rounded-full bg-[#25D366]/25 blur-lg pointer-events-none transition-all duration-300 group-hover:bg-[#25D366]/50" />
+            <div className="absolute -bottom-2 w-12 sm:w-24 h-3 sm:h-4 rounded-full bg-[#25D366]/25 blur-lg pointer-events-none transition-all duration-300" />
 
-            {/* Main Interactive Bot Button - Large on desktop, sleek & compact on mobile */}
+            {/* Main Interactive Bot Button - Strictly the round circle avatar is clickable */}
             <button
               onClick={() => setBotOpen(!botOpen)}
               type="button"
-              className="relative w-14 h-14 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full p-[2px] sm:p-[2.5px] bg-gradient-to-tr from-[#25D366] via-[#34E38A] to-[#128C7E] shadow-[0_8px_25px_rgba(0,0,0,0.8),0_0_18px_rgba(37,211,102,0.35)] sm:shadow-[0_12px_36px_rgba(0,0,0,0.8),0_0_28px_rgba(37,211,102,0.35)] hover:shadow-[0_16px_45px_rgba(0,0,0,0.9),0_0_42px_rgba(37,211,102,0.6)] hover:scale-105 active:scale-95 transition-all duration-300 ease-out cursor-pointer flex items-center justify-center overflow-hidden group/btn"
+              className="relative w-14 h-14 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full p-[2px] sm:p-[2.5px] bg-gradient-to-tr from-[#25D366] via-[#34E38A] to-[#128C7E] shadow-[0_8px_25px_rgba(0,0,0,0.8),0_0_18px_rgba(37,211,102,0.35)] sm:shadow-[0_12px_36px_rgba(0,0,0,0.8),0_0_28px_rgba(37,211,102,0.35)] hover:shadow-[0_16px_45px_rgba(0,0,0,0.9),0_0_42px_rgba(37,211,102,0.6)] hover:scale-105 active:scale-95 transition-all duration-300 ease-out cursor-pointer flex items-center justify-center overflow-hidden group/btn pointer-events-auto"
               aria-label="Toggle Goye AI Assistant"
             >
               {botOpen ? (
@@ -2149,18 +2210,8 @@ export default function Navbar() {
 
       {/* User Credit Earned & Free User Toast Notification Banner */}
       {(activeToast || showFreeUserToast) && (
-        <div className={`fixed top-24 right-4 sm:right-6 z-[100005] bg-[#0E1613]/98 border-2 ${activeToast?.type === 'request_rejected' ? 'border-red-500 shadow-[0_10px_40px_rgba(239,68,68,0.35)]' : 'border-[#25D366] shadow-[0_10px_40px_rgba(37,211,102,0.35)]'} text-white px-5 py-4 rounded-2xl flex items-center gap-4 animate-bounce max-w-sm backdrop-blur-xl`}>
-          <div className={`w-10 h-10 rounded-full ${activeToast?.type === 'request_rejected' ? 'bg-red-500/20 text-red-400' : 'bg-[#25D366]/20 text-[#25D366]'} flex items-center justify-center text-xl shrink-0`}>
-            {activeToast ? (activeToast.type === 'request_rejected' ? "❌" : (activeToast.title?.includes("Queued") ? "⏳" : "🎉")) : "🎁"}
-          </div>
-          <div className="flex-1 min-w-0 text-left">
-            <p className={`text-xs sm:text-sm font-extrabold ${activeToast?.type === 'request_rejected' ? 'text-red-400' : 'text-[#6CFFB0]'} leading-tight whitespace-pre-line`}>
-              {activeToast ? activeToast.message : `${effectiveCredits !== undefined ? effectiveCredits : 30} Free Trial Credits Activated!`}
-            </p>
-            <p className="text-[10px] text-white/60 font-medium mt-1">
-              {activeToast ? (activeToast.title || (activeToast.type === 'request_rejected' ? "Plan Request Rejected" : "Your subscription plan is active!")) : "Enjoy bulk WhatsApp messaging with Goye free tier!"}
-            </p>
-          </div>
+        <div className="fixed top-24 right-4 sm:right-6 z-[100005] max-w-sm pointer-events-auto">
+          {/* Static Into (✕) Button pinned at the top-right, perfectly still without jumping */}
           <button 
             onClick={() => {
               if (activeToast) {
@@ -2171,11 +2222,26 @@ export default function Navbar() {
                 sessionStorage.setItem("dismissedFreeUserToast", "true");
               }
             }}
-            className="text-white/40 hover:text-white text-xs bg-white/10 p-1.5 rounded-full transition-colors shrink-0 cursor-pointer"
+            className="absolute -top-2.5 -right-2.5 z-30 w-7 h-7 rounded-full bg-[#1A251F] hover:bg-[#253A2E] text-white/70 hover:text-white border border-[#25D366]/40 hover:border-[#25D366] shadow-[0_4px_12px_rgba(0,0,0,0.6)] flex items-center justify-center text-xs font-bold transition-all duration-200 cursor-pointer hover:scale-110 active:scale-95"
             title="Dismiss"
           >
             ✕
           </button>
+
+          {/* Bouncing Notification Content Card */}
+          <div className={`bg-[#0E1613]/98 border-2 ${activeToast?.type === 'request_rejected' ? 'border-red-500 shadow-[0_10px_40px_rgba(239,68,68,0.35)]' : 'border-[#25D366] shadow-[0_10px_40px_rgba(37,211,102,0.35)]'} text-white px-5 py-4 rounded-2xl flex items-center gap-4 animate-bounce backdrop-blur-xl relative z-10`}>
+            <div className={`w-10 h-10 rounded-full ${activeToast?.type === 'request_rejected' ? 'bg-red-500/20 text-red-400' : 'bg-[#25D366]/20 text-[#25D366]'} flex items-center justify-center text-xl shrink-0`}>
+              {activeToast ? (activeToast.type === 'request_rejected' ? "❌" : (activeToast.title?.includes("Queued") ? "⏳" : "🎉")) : "🎁"}
+            </div>
+            <div className="flex-1 min-w-0 text-left pr-2">
+              <p className={`text-xs sm:text-sm font-extrabold ${activeToast?.type === 'request_rejected' ? 'text-red-400' : 'text-[#6CFFB0]'} leading-tight whitespace-pre-line`}>
+                {activeToast ? activeToast.message : `${effectiveCredits !== undefined ? effectiveCredits : 30} Free Trial Credits Activated!`}
+              </p>
+              <p className="text-[10px] text-white/60 font-medium mt-1">
+                {activeToast ? (activeToast.title || (activeToast.type === 'request_rejected' ? "Plan Request Rejected" : "Your subscription plan is active!")) : "Enjoy bulk WhatsApp messaging with Goye free tier!"}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2186,6 +2252,11 @@ export default function Navbar() {
             {/* Close Button */}
             <button
               onClick={() => {
+                const currentEmail = (localStorage.getItem("email") || "").toLowerCase().trim();
+                const notifKey = upgradeApprovalModal?._id || upgradeApprovalModal?.requestId || currentEmail;
+                if (notifKey) {
+                  localStorage.setItem(`dismissedUpgradeModal_${notifKey}`, "true");
+                }
                 setUpgradeApprovalModal(null);
                 setDismissedUpgradeModal(true);
               }}

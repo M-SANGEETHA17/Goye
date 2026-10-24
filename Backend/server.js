@@ -2655,7 +2655,7 @@ app.post('/api/free-user/message-sent', async (req, res) => {
 
 app.get('/api/admin/free-users', async (req, res) => {
   try {
-    const freeUsers = await FreeUser.find({}, '-password').sort({ _id: -1 }).lean();
+    const freeUsers = await FreeUser.find({}).sort({ _id: -1 }).lean();
     const withStatus = freeUsers.map((u) => ({ ...u, status: u.status || "active" }));
     res.status(200).json(withStatus);
   } catch (error) {
@@ -2675,7 +2675,7 @@ app.patch('/api/admin/free-users/:id/status', async (req, res) => {
       req.params.id,
       { status },
       { returnDocument: 'after' }
-    ).select('-password');
+    );
 
     if (!freeUser) return res.status(404).json({ message: "Free user not found" });
 
@@ -2691,7 +2691,7 @@ app.patch('/api/admin/free-users/:id/status', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await User.find({}, '-password').sort({ _id: -1 }).lean();
+    const users = await User.find({}).sort({ _id: -1 }).lean();
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: "Error fetching users", error });
@@ -2705,6 +2705,142 @@ app.delete('/api/users/:id', async (req, res) => {
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error deleting user", error });
+  }
+});
+
+// Admin endpoint to change or assign a plan to any user directly
+app.post('/api/admin/change-user-plan', async (req, res) => {
+  try {
+    const { email, plan } = req.body;
+    if (!email || !plan) {
+      return res.status(400).json({ success: false, message: "Email and plan are required." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const safeRegex = new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+
+    const lowerPlan = String(plan).toLowerCase();
+    let durationMs = 24 * 60 * 60 * 1000;
+    let durationText = "24 Hours";
+
+    if (lowerPlan.includes('week')) {
+      durationMs = 7 * 24 * 60 * 60 * 1000;
+      durationText = "7 Days";
+    } else if (lowerPlan.includes('15') || lowerPlan.includes('fifteen')) {
+      durationMs = 15 * 24 * 60 * 60 * 1000;
+      durationText = "15 Days";
+    } else if (lowerPlan.includes('3 month') || lowerPlan.includes('three')) {
+      durationMs = 90 * 24 * 60 * 60 * 1000;
+      durationText = "3 Months";
+    } else if (lowerPlan.includes('6 month') || lowerPlan.includes('six')) {
+      durationMs = 180 * 24 * 60 * 60 * 1000;
+      durationText = "6 Months";
+    } else if (lowerPlan.includes('18 month') || lowerPlan.includes('eighteen')) {
+      durationMs = 540 * 24 * 60 * 60 * 1000;
+      durationText = "18 Months";
+    } else if (lowerPlan.includes('year') || lowerPlan.includes('1 yr')) {
+      durationMs = 365 * 24 * 60 * 60 * 1000;
+      durationText = "1 Year";
+    } else if (lowerPlan.includes('month')) {
+      durationMs = 30 * 24 * 60 * 60 * 1000;
+      durationText = "30 Days";
+    }
+
+    const formatDate = (date) => {
+      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' +
+             date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    const db = mongoose.connection.db;
+    let existingUser = await User.findOne({ email: safeRegex });
+    if (!existingUser) {
+      existingUser = await FreeUser.findOne({ email: safeRegex });
+    }
+
+    if (!existingUser) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const nowTime = Date.now();
+    const isCurrentlyActive = existingUser.isSubscribed && 
+      existingUser.subscriptionExpiresAt && 
+      new Date(existingUser.subscriptionExpiresAt).getTime() > nowTime;
+
+    let userUpdate = {};
+    let notifTitle = "";
+    let notifMessage = "";
+    let isQueued = false;
+
+    if (isCurrentlyActive) {
+      const baseTime = (existingUser.upcomingPlanExpiresAt && new Date(existingUser.upcomingPlanExpiresAt).getTime() > new Date(existingUser.subscriptionExpiresAt).getTime())
+        ? new Date(existingUser.upcomingPlanExpiresAt).getTime()
+        : new Date(existingUser.subscriptionExpiresAt).getTime();
+
+      const upcomingStartsAt = new Date(baseTime);
+      const upcomingExpiresAt = new Date(baseTime + durationMs);
+
+      userUpdate = {
+        isSubscribed: true,
+        hasEverSubscribed: true,
+        credits: 99999,
+        upcomingPlan: plan,
+        upcomingPlanStartsAt: upcomingStartsAt,
+        upcomingPlanExpiresAt: upcomingExpiresAt
+      };
+      isQueued = true;
+      notifTitle = "⏳ Plan Queued!";
+      notifMessage = `Your ${plan} has been approved and queued by Admin!\nIt will automatically activate when your current plan ends on: ${formatDate(upcomingStartsAt)}\nValid until: ${formatDate(upcomingExpiresAt)} (${durationText}).`;
+    } else {
+      const startedAt = new Date();
+      const expiresAt = new Date(startedAt.getTime() + durationMs);
+
+      userUpdate = {
+        isSubscribed: true,
+        hasEverSubscribed: true,
+        subscriptionPlan: plan,
+        subscriptionStartedAt: startedAt,
+        subscriptionExpiresAt: expiresAt,
+        upcomingPlan: "",
+        upcomingPlanStartsAt: null,
+        upcomingPlanExpiresAt: null,
+        credits: 99999
+      };
+      notifTitle = "🎉 Plan Activated!";
+      notifMessage = `Your ${plan} has been assigned and activated by Admin.\nStart: ${formatDate(startedAt)}\nExpires: ${formatDate(expiresAt)}\nValid for: ${durationText}.`;
+    }
+
+    if (db) {
+      await db.collection('users').updateMany({ email: safeRegex }, { $set: userUpdate });
+      await db.collection('freeusers').updateMany({ email: safeRegex }, { $set: userUpdate });
+    }
+    await User.updateMany({ email: safeRegex }, { $set: userUpdate });
+    await FreeUser.updateMany({ email: safeRegex }, { $set: userUpdate });
+
+    try {
+      const Notification = require('./models/Notification');
+      const newNotif = new Notification({
+        userEmail: cleanEmail,
+        type: 'request_approved',
+        title: notifTitle,
+        message: notifMessage,
+        creditsEarned: 99999,
+        read: false,
+        createdAt: new Date()
+      });
+      await newNotif.save();
+    } catch (notifErr) {
+      console.warn("Could not save notification:", notifErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: isQueued ? `Plan "${plan}" queued successfully for ${cleanEmail}.` : `Plan "${plan}" activated immediately for ${cleanEmail}.`,
+      isQueued,
+      userUpdate
+    });
+  } catch (error) {
+    console.error("Admin change user plan error:", error);
+    return res.status(500).json({ success: false, message: "Error changing user plan.", error: error.message });
   }
 });
 
@@ -2723,8 +2859,28 @@ app.post('/api/user/credits', async (req, res) => {
     let user = null;
     let isFreeUser = reqIsFreeUser === true;
     const cleanEmail = email ? String(email).trim() : "";
+    const nowTime = Date.now();
 
-    if (isFreeUser) {
+    // Check if user has an active paid subscription in User or FreeUser collection
+    let paidUserDoc = null;
+    if (cleanEmail) {
+      const emailRegex = new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      paidUserDoc = await User.findOne({ email: emailRegex });
+      if (!paidUserDoc && mongoose.models.FreeUser) {
+        paidUserDoc = await FreeUser.findOne({ email: emailRegex });
+      }
+    }
+    const hasActiveSub = paidUserDoc && (
+      paidUserDoc.isSubscribed ||
+      (paidUserDoc.subscriptionExpiresAt && new Date(paidUserDoc.subscriptionExpiresAt).getTime() > nowTime) ||
+      (paidUserDoc.upcomingPlanExpiresAt && new Date(paidUserDoc.upcomingPlanExpiresAt).getTime() > nowTime)
+    );
+
+    // If the user has an active subscription, they are definitively a SUBSCRIBED USER
+    if (hasActiveSub) {
+      isFreeUser = false;
+      user = paidUserDoc;
+    } else if (isFreeUser) {
       if (id && mongoose.Types.ObjectId.isValid(id)) {
         user = await FreeUser.findById(id);
       }

@@ -1,24 +1,58 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FiSearch, FiMapPin, FiPhone, FiCheckCircle, FiCheck, FiX, FiLayers, FiActivity, FiRefreshCw } from "react-icons/fi";
+import { FiSearch, FiMapPin, FiPhone, FiCheckCircle, FiCheck, FiX, FiLayers, FiActivity, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import { FaBuilding, FaStar, FaDownload, FaPlay } from "react-icons/fa";
 import io from "socket.io-client";
 import * as XLSX from "xlsx";
 
 export default function WebScraper() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [locationQuery, setLocationQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return sessionStorage.getItem("goye_web_scraper_query") || "";
+    } catch (e) {
+      return "";
+    }
+  });
+  const [locationQuery, setLocationQuery] = useState(() => {
+    try {
+      return sessionStorage.getItem("goye_web_scraper_location") || "";
+    } catch (e) {
+      return "";
+    }
+  });
   const [isScraping, setIsScraping] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [hasScrapped, setHasScrapped] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("goye_web_scraper_selected");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [hasScrapped, setHasScrapped] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("goye_web_scraper_leads");
+      return saved ? JSON.parse(saved).length > 0 : false;
+    } catch (e) {
+      return false;
+    }
+  });
   const [scrapeFailed, setScrapeFailed] = useState(false);
   const [toast, setToast] = useState({ show: false, type: "", message: "" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [showClearModal, setShowClearModal] = useState(false);
 
   // Page size for client-side pagination
   const PAGE_SIZE = 16;
 
-  const [leadsData, setLeadsData] = useState([]);
+  const [leadsData, setLeadsData] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("goye_web_scraper_leads");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // ── Socket.IO for progressive scraping ────────────────────────────────────
   const socketRef = useRef(null);
@@ -26,7 +60,7 @@ export default function WebScraper() {
   useEffect(() => {
     const socketUrl = window.location.hostname === "localhost"
       ? "http://localhost:5000"
-      : (process.env.REACT_APP_API_URL || "https://goye.onrender.com");
+      : (process.env.REACT_APP_API_URL || "http://localhost:5000");
 
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"],
@@ -178,10 +212,55 @@ export default function WebScraper() {
     }
   };
 
+  // Persist leads and selections to sessionStorage
+  useEffect(() => {
+    try {
+      if (leadsData.length > 0) {
+        sessionStorage.setItem("goye_web_scraper_leads", JSON.stringify(leadsData));
+      }
+    } catch (e) {
+      console.warn("Could not save leads to sessionStorage", e);
+    }
+  }, [leadsData]);
+
+  useEffect(() => {
+    try {
+      if (selectedIds.length > 0) {
+        sessionStorage.setItem("goye_web_scraper_selected", JSON.stringify(selectedIds));
+      }
+    } catch (e) {}
+  }, [selectedIds]);
+
+  useEffect(() => {
+    try {
+      if (searchQuery) sessionStorage.setItem("goye_web_scraper_query", searchQuery);
+      if (locationQuery) sessionStorage.setItem("goye_web_scraper_location", locationQuery);
+    } catch (e) {}
+  }, [searchQuery, locationQuery]);
+
+  const handleConfirmClear = () => {
+    setLeadsData([]);
+    setSelectedIds([]);
+    setHasScrapped(false);
+    setScrapeFailed(false);
+    setCurrentPage(1);
+    setShowClearModal(false);
+    try {
+      sessionStorage.removeItem("goye_web_scraper_leads");
+      sessionStorage.removeItem("goye_web_scraper_selected");
+    } catch (e) {}
+    setToast({
+      show: true,
+      type: "success",
+      message: "All scraped leads cleared successfully!"
+    });
+    setTimeout(() => setToast({ show: false, type: "", message: "" }), 3000);
+  };
+
   const handleStartScrape = (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) {
-      setToast({ show: true, type: "error", message: "⚠️ Please enter a search query!" });
+      setToast({ show: true, type: "error", message: "Please enter a search query!" });
       setTimeout(() => setToast({ show: false, type: "", message: "" }), 3000);
       return;
     }
@@ -194,6 +273,10 @@ export default function WebScraper() {
     setScrapeFailed(false);
     setCurrentPage(1);
     setIsScraping(true);
+    try {
+      sessionStorage.removeItem("goye_web_scraper_leads");
+      sessionStorage.removeItem("goye_web_scraper_selected");
+    } catch (e) {}
 
     // Emit to backend — results stream back via scrape_lead events
     socketRef.current.emit("start_scrape", {
@@ -242,7 +325,7 @@ export default function WebScraper() {
       {/* Toast Notification */}
       {toast.show && (
         <div
-          className={`fixed top-5 right-5 z-[200] px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm font-bold border transition-all animate-bounce backdrop-blur-xl max-w-[calc(100vw-2rem)] ${
+          className={`fixed bottom-6 right-6 z-[200] px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm font-bold border transition-all animate-bounce backdrop-blur-xl max-w-[calc(100vw-2rem)] ${
             toast.type === "success"
               ? "bg-[#111B21]/95 border-[#25D366] text-[#25D366] shadow-[0_0_30px_rgba(37,211,102,0.35)]"
               : "bg-[#111B21]/95 border-red-500 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.35)]"
@@ -250,6 +333,45 @@ export default function WebScraper() {
         >
           {toast.type === "success" ? <FiCheck size={18} className="shrink-0" /> : <FiX size={18} className="shrink-0" />}
           <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Clear Data */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#121A16] border border-white/10 rounded-2xl sm:rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.8)] relative text-center">
+            {/* Warning Trash Icon Circle */}
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(244,63,94,0.15)]">
+              <FiTrash2 size={28} />
+            </div>
+
+            <h3 className="text-xl font-extrabold text-white mb-2">
+              Clear Scraped Leads?
+            </h3>
+            
+            <p className="text-white/60 text-sm leading-relaxed mb-6">
+              Are you sure you want to clear all <strong className="text-white">{leadsData.length}</strong> scraped places? This action will remove current results and cannot be undone.
+            </p>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowClearModal(false)}
+                className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-bold text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleConfirmClear}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-extrabold text-sm shadow-[0_0_20px_rgba(244,63,94,0.35)] transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <FiTrash2 size={16} />
+                <span>Yes, Clear All</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -322,6 +444,18 @@ export default function WebScraper() {
               >
                 <FaDownload className={`text-xs ${isExporting ? "animate-bounce text-[#25D366]" : "text-[#25D366]"}`} />
                 <span>{isExporting ? "Exporting..." : `Export Selected (${selectedIds.length})`}</span>
+              </button>
+
+              {/* Clear Data Button */}
+              <button
+                type="button"
+                onClick={() => setShowClearModal(true)}
+                disabled={leadsData.length === 0 || isScraping}
+                className="w-full sm:w-auto px-4 py-3.5 rounded-xl sm:rounded-2xl font-bold text-sm text-rose-300 flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 active:scale-95 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 shadow-md cursor-pointer disabled:opacity-30 disabled:hover:scale-100 disabled:cursor-not-allowed whitespace-nowrap"
+                title="Clear all scraped data"
+              >
+                <FiTrash2 className="text-rose-400 text-sm" />
+                <span>Clear Data</span>
               </button>
             </div>
 

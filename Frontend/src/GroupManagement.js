@@ -4,7 +4,7 @@ import { FcGoogle } from "react-icons/fc";
 import * as XLSX from "xlsx";
 import { socket as whatsappSocket } from "./WhatsAppAuth";
 
-const API_BASE = (process.env.REACT_APP_API_URL || "https://goye.onrender.com").replace(/\/+$/, "");
+const API_BASE = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 function splitCombinedPhoneNumbers(rawVal) {
   if (!rawVal) return [];

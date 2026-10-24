@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Search, Bell, Check, X, Eye, Edit2, Trash2, Smartphone, Mail, 
-  ChevronLeft, ChevronRight, Users, ShieldCheck, UserCheck, Activity, Calendar, Zap, MessageSquare, Building2, Briefcase
+  Search, Check, X, Eye, EyeOff, Lock, Copy, Edit2, Trash2, Smartphone, Mail, 
+  ChevronLeft, ChevronRight, Users, ShieldCheck, Activity, Calendar, Zap, MessageSquare, 
+  Building2, Briefcase, Clock, Sparkles, RefreshCw, Crown, Award, UserCheck
 } from 'lucide-react';
+import { FaWhatsapp } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+
+const API_BASE_URL = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
 
 export default function AdminUsers() {
   const navigate = useNavigate();
@@ -14,37 +18,73 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(() => !sessionStorage.getItem('goye_users'));
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [editRowId, setEditRowId] = useState(null);
-  const [editFormData, setEditFormData] = useState({ name: "", email: "", phone: "" });
+  const [editFormData, setEditFormData] = useState({ name: "", email: "", phone: "", password: "" });
+  const [visiblePasswords, setVisiblePasswords] = useState({});
+  const [copiedId, setCopiedId] = useState(null);
   const [viewUser, setViewUser] = useState(null);
   const [viewUserStats, setViewUserStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [planModalUser, setPlanModalUser] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState("One Month");
+  const [updatingPlan, setUpdatingPlan] = useState(false);
+  const [planSuccessMsg, setPlanSuccessMsg] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  let isFetchingUsers = false;
-  
-  useEffect(() => {
-    fetchUsers(); // Initial load
-    const intervalId = setInterval(fetchUsers, 60000); // Poll every 60 seconds instead of 5
-    return () => clearInterval(intervalId); // Cleanup
-  }, []);
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  const fetchUsers = async () => {
-    if (isFetchingUsers) return;
-    isFetchingUsers = true;
+  const togglePasswordVisibility = (id) => {
+    setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const copyPassword = (text, id) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleOpenWhatsApp = (phone, name) => {
+    if (!phone) {
+      alert("No phone number registered for this user.");
+      return;
+    }
+    let cleanPhone = String(phone).replace(/[^0-9]/g, "");
+    if (cleanPhone.length === 10) {
+      cleanPhone = `91${cleanPhone}`;
+    }
+    const message = encodeURIComponent(`Hello ${name || "User"}, this is Goye Support.`);
+    window.open(`https://wa.me/${cleanPhone}?text=${message}`, "_blank", "noopener,noreferrer");
+  };
+
+  const fetchUsers = async (showAnim = false) => {
+    if (showAnim) setIsRefreshing(true);
     try {
-      const response = await fetch("https://goye.onrender.com/api/users");
+      const response = await fetch(`${API_BASE_URL}/api/users`);
       if (!response.ok) throw new Error(`Server returned ${response.status}: Please restart your Node.js backend!`);
       const data = await response.json();
       setUsers(data); 
       sessionStorage.setItem('goye_users', JSON.stringify(data));
+      setError(null);
     } catch (err) {
       console.error("Error fetching users:", err);
       setError(err.message);
     } finally {
       setLoading(false);
-      isFetchingUsers = false;
+      if (showAnim) {
+        setTimeout(() => setIsRefreshing(false), 500);
+      }
     }
   };
+
+  useEffect(() => {
+    fetchUsers(false);
+    const intervalId = setInterval(() => fetchUsers(false), 60000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handleView = async (user) => {
     setViewUser(user);
@@ -53,7 +93,7 @@ export default function AdminUsers() {
     
     if (user.email) {
       try {
-        const response = await fetch("https://goye.onrender.com/api/user/credits", {
+        const response = await fetch(`${API_BASE_URL}/api/user/credits`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: user.email })
@@ -74,7 +114,7 @@ export default function AdminUsers() {
 
   const handleEditClick = (user) => {
     setEditRowId(user._id);
-    setEditFormData({ name: user.name, email: user.email, phone: user.phone || "" });
+    setEditFormData({ name: user.name, email: user.email, phone: user.phone || "", password: user.password || "" });
   };
 
   const handleEditChange = (e) => {
@@ -87,6 +127,7 @@ export default function AdminUsers() {
     if(index !== -1) {
       newUsers[index] = { ...newUsers[index], ...editFormData };
       setUsers(newUsers);
+      sessionStorage.setItem('goye_users', JSON.stringify(newUsers));
     }
     setEditRowId(null);
   };
@@ -98,11 +139,13 @@ export default function AdminUsers() {
   const handleDelete = async (id) => {
     if(window.confirm("Are you sure you want to completely delete this user? This action cannot be undone.")) {
       try {
-        const response = await fetch(`https://goye.onrender.com/api/users/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
           method: 'DELETE',
         });
         if (response.ok) {
-          setUsers(users.filter(u => u._id !== id));
+          const updated = users.filter(u => u._id !== id);
+          setUsers(updated);
+          sessionStorage.setItem('goye_users', JSON.stringify(updated));
         } else {
           alert("Failed to delete user. Please try again.");
         }
@@ -113,364 +156,826 @@ export default function AdminUsers() {
     }
   };
 
-  const sortedUsersAsc = [...users].reverse();
-  const seqIdMap = {};
-  sortedUsersAsc.forEach((u, index) => {
-    if (u._id) {
-      seqIdMap[u._id] = `GOYE-S${String(index + 1).padStart(3, '0')}`;
+  const handleApplyPlan = async () => {
+    if (!planModalUser || !planModalUser.email) return;
+    setUpdatingPlan(true);
+    setPlanSuccessMsg("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/change-user-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: planModalUser.email,
+          plan: selectedPlan
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setPlanSuccessMsg(data.message || "Plan updated successfully!");
+        fetchUsers(false);
+        if (viewUser && viewUser.email === planModalUser.email) {
+          handleView(viewUser);
+        }
+        setTimeout(() => {
+          setPlanModalUser(null);
+          setPlanSuccessMsg("");
+        }, 1800);
+      } else {
+        alert(data.message || "Failed to update plan.");
+      }
+    } catch (err) {
+      console.error("Error updating plan:", err);
+      alert("Error contacting server. Please ensure backend is running.");
+    } finally {
+      setUpdatingPlan(false);
     }
-  });
+  };
 
-  const filteredUsers = users.filter(user => {
-    const q = searchQuery.toLowerCase();
-    return (
-      (user.name && user.name.toLowerCase().includes(q)) ||
-      (user.email && user.email.toLowerCase().includes(q)) ||
-      (user.phone && user.phone.includes(q)) ||
-      (user.businessName && user.businessName.toLowerCase().includes(q)) ||
-      (user.businessType && user.businessType.toLowerCase().includes(q))
-    );
-  });
+  const sortedUsersAsc = useMemo(() => {
+    return [...users].reverse();
+  }, [users]);
+
+  const seqIdMap = useMemo(() => {
+    const map = {};
+    sortedUsersAsc.forEach((u, index) => {
+      if (u._id) {
+        map[u._id] = `GOYE-S${String(index + 1).padStart(3, '0')}`;
+      }
+    });
+    return map;
+  }, [sortedUsersAsc]);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const isSub = user.isSubscribed && user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt).getTime() > Date.now();
+      if (statusFilter === "Active" && !isSub) return false;
+      if (statusFilter === "Expired" && isSub) return false;
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        (user.name && user.name.toLowerCase().includes(q)) ||
+        (user.email && user.email.toLowerCase().includes(q)) ||
+        (user.phone && user.phone.includes(q)) ||
+        (user.businessName && user.businessName.toLowerCase().includes(q)) ||
+        (user.businessType && user.businessType.toLowerCase().includes(q))
+      );
+    });
+  }, [users, searchQuery, statusFilter]);
+
+  // Paginated users
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredUsers.slice(start, start + itemsPerPage);
+  }, [filteredUsers, currentPage]);
+
+  const activeSubscribersCount = users.filter(u => 
+    u.isSubscribed && u.subscriptionExpiresAt && new Date(u.subscriptionExpiresAt).getTime() > Date.now()
+  ).length;
 
   return (
-    <div className="admin-main-content min-h-screen bg-[#f4fcf7] font-sans text-gray-800 relative overflow-x-hidden">
+    <div className="admin-main-content min-h-screen bg-gradient-to-br from-[#f0fdf4] via-[#f8fafc] to-[#ecfdf5] font-sans text-slate-800 relative">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
         * { font-family: 'Plus Jakarta Sans', sans-serif; }
-        
-        .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .dash-card {
-          background: #ffffff;
+        .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(14px);
+          border: 1px solid rgba(16, 185, 129, 0.16);
+          box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
           border-radius: 20px;
-          border: 1px solid rgba(16, 185, 129, 0.15);
-          box-shadow: 0 4px 24px -10px rgba(16, 185, 129, 0.1);
-          transition: all 0.3s ease;
         }
-        .dash-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 32px -12px rgba(16, 185, 129, 0.25);
-          border-color: rgba(16, 185, 129, 0.4);
+
+        .stat-card-glow {
+          position: relative;
+          overflow: hidden;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        
-        .modal-overlay {
-          background: rgba(6, 78, 59, 0.5);
-          backdrop-filter: blur(4px);
-          animation: fadeIn 0.2s ease-out;
+        .stat-card-glow:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 14px 34px -8px rgba(16, 185, 129, 0.16);
         }
-        .modal-content {
-          animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+        .custom-scroll::-webkit-scrollbar {
+          height: 6px;
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes scaleUp { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .custom-scroll::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 9999px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+          background: #a7f3d0;
+          border-radius: 9999px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+          background: #10B981;
+        }
+
+        .avatar-gradient {
+          background: linear-gradient(135deg, #10B981 0%, #059669 50%, #047857 100%);
+        }
       `}</style>
 
-      {/* Header - Fixed Alignment */}
-      <header className="w-full pl-16 pr-4 md:px-8 py-4 bg-white/80 backdrop-blur-md border-b border-[#a7f3d0]">
+      {/* Top Banner / Header */}
+      <header className="sticky top-0 z-30 w-full bg-white/85 backdrop-blur-md border-b border-emerald-100/80 px-4 md:px-8 py-4 transition-all">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#10B981] to-[#059669] flex items-center justify-center text-white shadow-lg">
-              <Users size={20} />
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl avatar-gradient flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/20">
+              <Users size={22} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#064e3b]">Subscribed Users</h2>
-              <p className="text-xs text-[#10B981] font-medium">View, edit, and manage subscribed members</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Subscribed Users</h1>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <Crown size={12} className="text-emerald-700" />
+                  Premium Members
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">View, edit, monitor credits, and manage subscribed accounts</p>
             </div>
           </div>
-          <div className="flex items-center gap-5">
-            {/* Notification icon removed from here per user request */}
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => fetchUsers(true)}
+              disabled={isRefreshing}
+              className="px-3.5 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
+              title="Refresh users"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-emerald-600" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+            <div className="text-right hidden sm:block">
+              <p className="text-[11px] text-slate-400 font-medium">Subscribed Pool</p>
+              <p className="text-xs font-extrabold text-emerald-700">{users.length} Registered</p>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
+      {/* Main Content Area */}
+      <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
         
         {/* Top KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 slide-up" style={{ animationDelay: '0.1s' }}>
-          {[
-            { label: "Total Registered", value: users.length, icon: Users, color: "#10B981", bg: "#e6f7ef" },
-            { label: "Active Today", value: Math.max(1, Math.floor(users.length * 0.4)), icon: Activity, color: "#3b82f6", bg: "#eff6ff" },
-            { label: "Verified Users", value: Math.max(0, users.length - 2), icon: ShieldCheck, color: "#f59e0b", bg: "#fffbeb" },
-          ].map((kpi, i) => (
-            <div key={i} className="dash-card p-6 flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: kpi.bg, color: kpi.color }}>
-                <kpi.icon size={28} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-500">{kpi.label}</p>
-                <p className="text-2xl font-bold text-[#064e3b] mt-1">{kpi.value}</p>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-emerald-500">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Registered</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 mt-1">{users.length}</h3>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Paid & upgraded accounts</p>
             </div>
-          ))}
-        </div>
-
-        {/* Users Table Card */}
-        <div className="dash-card slide-up overflow-hidden" style={{ animationDelay: '0.2s' }}>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 p-3.5 sm:p-6 border-b border-[#e6f7ef]">
-            <h2 className="text-base sm:text-lg font-bold text-[#064e3b]">User Directory</h2>
-            <div className="flex items-center gap-2 bg-[#f4fcf7] border border-[#a7f3d0] focus-within:border-[#10B981] rounded-xl px-3.5 sm:px-4 py-2 sm:py-2.5 w-full sm:w-80 transition-colors">
-              <Search size={16} className="text-[#059669] shrink-0" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, email, phone..."
-                className="bg-transparent text-xs sm:text-sm font-medium text-[#064e3b] outline-none w-full placeholder:text-gray-400"
-              />
+            <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center ring-1 ring-emerald-200/60 shadow-xs">
+              <Users size={26} />
             </div>
           </div>
 
-          <div className="overflow-x-auto [scrollbar-width:none]">
-            <table className="w-full text-left border-collapse min-w-[650px] sm:min-w-full">
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-teal-500">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Subscriptions</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-teal-900 mt-1">{activeSubscribersCount}</h3>
+              <p className="text-[11px] text-teal-600 font-semibold mt-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span>
+                <span>Active validity today</span>
+              </p>
+            </div>
+            <div className="w-13 h-13 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center ring-1 ring-teal-200/60 shadow-xs">
+              <Activity size={26} />
+            </div>
+          </div>
+
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-amber-500">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Verified Members</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-amber-900 mt-1">{Math.max(0, users.length - 1)}</h3>
+              <p className="text-[11px] text-amber-600 font-semibold mt-1">Full service access</p>
+            </div>
+            <div className="w-13 h-13 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center ring-1 ring-amber-200/60 shadow-xs">
+              <ShieldCheck size={26} />
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="glass-card p-4 md:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
+          <div className="relative flex-1 max-w-lg">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by name, email, phone, business..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-emerald-200/80 bg-white/90 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none focus:border-emerald-500 focus:ring-3 focus:ring-emerald-500/15 transition-all shadow-2xs"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery("")} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+            {[
+              { label: "All", count: users.length },
+              { label: "Active", count: activeSubscribersCount },
+              { label: "Expired", count: Math.max(0, users.length - activeSubscribersCount) }
+            ].map(tab => {
+              const active = statusFilter === tab.label;
+              return (
+                <button
+                  key={tab.label}
+                  onClick={() => {
+                    setStatusFilter(tab.label);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    active
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                      : "bg-slate-100/90 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                    active ? "bg-emerald-800 text-emerald-100" : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Modern Table Container */}
+        <div className="glass-card overflow-hidden border border-emerald-200/70 shadow-sm">
+          <div className="overflow-x-auto custom-scroll">
+            <table className="w-full text-left border-collapse min-w-[980px]">
               <thead>
-                <tr className="bg-[#f4fcf7] text-gray-500 text-sm font-semibold uppercase tracking-wider">
-                  <th className="px-6 py-4">User Details</th>
-                  <th className="px-6 py-4">Contact Info</th>
-                  <th className="px-6 py-4">Business Info</th>
-                  <th className="px-6 py-4">Joined On</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                <tr className="bg-gradient-to-r from-emerald-50/90 to-teal-50/60 border-b border-emerald-100 text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider">
+                  <th className="py-4 pl-6 pr-4 w-[240px]">User Profile</th>
+                  <th className="py-4 px-4 w-[210px]">Contact Info</th>
+                  <th className="py-4 px-4 w-[165px]">Password</th>
+                  <th className="py-4 px-4 w-[180px]">Business Info</th>
+                  <th className="py-4 px-4 w-[130px]">Joined Date</th>
+                  <th className="py-4 pl-4 pr-6 text-right w-[240px]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e6f7ef]">
+              <tbody className="divide-y divide-emerald-50/80 bg-white/70">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-[#10B981] font-bold animate-pulse">
-                      Loading users data...
+                    <td colSpan={6} className="py-20 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="w-9 h-9 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm font-bold text-slate-700">Loading Subscribed Users data...</span>
+                      </div>
                     </td>
                   </tr>
-                ) : filteredUsers.length === 0 ? (
+                ) : paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium">
-                      No users match your search.
+                    <td colSpan={6} className="py-16 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
+                          <Users size={28} />
+                        </div>
+                        <span className="text-base font-bold text-slate-800">No Users Match</span>
+                        <p className="text-xs text-slate-400">
+                          {searchQuery ? `No users found matching "${searchQuery}".` : "No subscribed user accounts found."}
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user._id} className="hover:bg-[#fcfdfd] transition-colors group">
-                      {editRowId === user._id ? (
-                        /* Inline Edit Mode */
-                        <>
-                          <td className="px-6 py-4">
-                            <input 
-                              type="text" name="name" value={editFormData.name} onChange={handleEditChange}
-                              className="w-full px-4 py-2 border border-[#a7f3d0] rounded-xl focus:border-[#10B981] outline-none text-sm font-bold text-[#064e3b]"
-                              placeholder="Full Name"
-                            />
-                          </td>
-                          <td className="px-6 py-4 space-y-2">
-                            <input 
-                              type="email" name="email" value={editFormData.email} onChange={handleEditChange}
-                              className="w-full px-4 py-2 border border-[#a7f3d0] rounded-xl focus:border-[#10B981] outline-none text-sm"
-                              placeholder="Email Address"
-                            />
-                            <input 
-                              type="text" name="phone" value={editFormData.phone} onChange={handleEditChange}
-                              className="w-full px-4 py-2 border border-[#a7f3d0] rounded-xl focus:border-[#10B981] outline-none text-sm"
-                              placeholder="Phone Number"
-                            />
-                          </td>
-                          <td className="px-6 py-4 text-xs text-[#059669] font-bold uppercase tracking-wide">
-                            <p>{user.businessName || "Not provided"}</p>
-                            <p className="text-gray-400 font-medium">{user.businessType || "N/A"}</p>
-                          </td>
-                          <td className="px-6 py-4 text-xs text-[#059669] font-bold uppercase tracking-wide">
-                            Editing Mode
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => handleSaveEdit(user._id)} className="p-2.5 rounded-xl bg-[#10B981] text-white hover:bg-[#059669] shadow-md transition-colors" title="Save Changes">
-                                <Check size={16} />
-                              </button>
-                              <button onClick={handleCancelEdit} className="p-2.5 rounded-xl bg-[#fef2f2] text-red-500 hover:bg-red-500 hover:text-white transition-colors" title="Cancel">
-                                <X size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        /* Normal View Mode */
-                        <>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#10B981] to-[#6ee7b7] flex items-center justify-center text-white text-xl font-bold shadow-sm">
-                                {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                  paginatedUsers.map((user) => {
+                    const seqId = seqIdMap[user._id] || "GOYE-S001";
+                    const isEditing = editRowId === user._id;
+
+                    return (
+                      <tr key={user._id} className="hover:bg-emerald-50/35 transition-all duration-150 group border-b border-slate-100 last:border-none">
+                        {isEditing ? (
+                          /* Inline Edit Mode */
+                          <>
+                            <td className="py-3.5 pl-6 pr-4 align-middle">
+                              <input 
+                                type="text" 
+                                name="name" 
+                                value={editFormData.name} 
+                                onChange={handleEditChange}
+                                className="w-full px-3 py-1.5 border border-emerald-400 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs font-bold text-slate-800"
+                                placeholder="Full Name"
+                              />
+                            </td>
+                            <td className="py-3.5 px-4 space-y-1 align-middle">
+                              <input 
+                                type="email" 
+                                name="email" 
+                                value={editFormData.email} 
+                                onChange={handleEditChange}
+                                className="w-full px-3 py-1.5 border border-emerald-400 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs"
+                                placeholder="Email"
+                              />
+                              <input 
+                                type="text" 
+                                name="phone" 
+                                value={editFormData.phone} 
+                                onChange={handleEditChange}
+                                className="w-full px-3 py-1.5 border border-emerald-400 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs"
+                                placeholder="Phone"
+                              />
+                            </td>
+                            <td className="py-3.5 px-4 align-middle">
+                              <input 
+                                type="text" 
+                                name="password" 
+                                value={editFormData.password || ""} 
+                                onChange={handleEditChange}
+                                className="w-full px-3 py-1.5 border border-emerald-400 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs font-mono"
+                                placeholder="Password"
+                              />
+                            </td>
+                            <td className="py-3.5 px-4 text-xs text-emerald-800 font-bold uppercase tracking-wide align-middle">
+                              <p className="truncate max-w-[160px]">{user.businessName || "Not provided"}</p>
+                              <p className="text-slate-400 font-medium">{user.businessType || "N/A"}</p>
+                            </td>
+                            <td className="py-3.5 px-4 text-[11px] text-amber-700 font-bold uppercase tracking-wide align-middle">
+                              Editing Mode
+                            </td>
+                            <td className="py-3.5 pl-4 pr-6 align-middle text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button 
+                                  onClick={() => handleSaveEdit(user._id)} 
+                                  className="p-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer" 
+                                  title="Save Changes"
+                                >
+                                  <Check size={14} />
+                                </button>
+                                <button 
+                                  onClick={handleCancelEdit} 
+                                  className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors cursor-pointer" 
+                                  title="Cancel"
+                                >
+                                  <X size={14} />
+                                </button>
                               </div>
-                              <div>
-                                <p className="font-bold text-[#064e3b] text-base">{user.name}</p>
-                                <p className="text-xs text-[#059669] font-medium uppercase tracking-wider mt-0.5">ID: {seqIdMap[user._id]}</p>
+                            </td>
+                          </>
+                        ) : (
+                          /* Normal View Mode */
+                          <>
+                            {/* USER PROFILE */}
+                            <td className="py-3.5 pl-6 pr-4 align-middle">
+                              <div className="flex items-center gap-3">
+                                <div className="relative shrink-0">
+                                  <div className="w-10 h-10 rounded-xl avatar-gradient flex items-center justify-center text-white font-extrabold text-sm shadow-sm shadow-emerald-500/20 transition-transform duration-200 group-hover:scale-105">
+                                    {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                                  </div>
+                                  <span 
+                                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white bg-emerald-500" 
+                                    title="Active Member"
+                                  />
+                                </div>
+                                <div className="min-w-0 pr-1">
+                                  <p className="font-bold text-slate-800 text-[13px] truncate group-hover:text-emerald-700 transition-colors" title={user.name}>
+                                    {user.name || "Unnamed"}
+                                  </p>
+                                  <div className="mt-0.5">
+                                    <span className="font-mono-code text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                                      ID: {seqId}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="space-y-1.5">
-                              <p className="text-sm text-gray-600 flex items-center gap-2">
-                                <Mail size={14} className="text-[#10B981]" /> {user.email || "No email"}
-                              </p>
-                              <p className="text-sm text-gray-600 flex items-center gap-2">
-                                <Smartphone size={14} className="text-[#10B981]" /> {user.phone || "No phone"}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="space-y-1.5">
-                              <p className="text-sm font-bold text-[#064e3b] flex items-center gap-2">
-                                <Building2 size={14} className="text-[#10B981]" /> {user.businessName || "Not provided"}
-                              </p>
-                              <p className="text-xs text-[#059669] uppercase tracking-wider font-medium flex items-center gap-2">
-                                <Briefcase size={14} className="text-gray-400" /> {user.businessType || "N/A"}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-medium text-gray-700">
-                              {user._id ? new Date(parseInt(user._id.substring(0,8), 16) * 1000).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) : "Unknown"}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => handleView(user)} className="p-2 rounded-lg bg-[#f4fcf7] text-[#059669] hover:bg-[#10B981] hover:text-white transition-colors" title="View Profile">
-                                <Eye size={18} />
-                              </button>
-                              <button onClick={() => handleEditClick(user)} className="p-2 rounded-lg bg-[#fffbeb] text-amber-600 hover:bg-amber-500 hover:text-white transition-colors" title="Edit User">
-                                <Edit2 size={18} />
-                              </button>
-                              <button onClick={() => handleDelete(user._id)} className="p-2 rounded-lg bg-[#fef2f2] text-red-500 hover:bg-red-500 hover:text-white transition-colors" title="Delete User">
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))
+                            </td>
+
+                            {/* CONTACT INFO */}
+                            <td className="py-3.5 px-4 align-middle">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                                  <Mail size={12} className="text-emerald-600 shrink-0" />
+                                  <span className="truncate max-w-[170px]" title={user.email}>{user.email || "No email"}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                                  <Smartphone size={12} className="text-emerald-600 shrink-0" />
+                                  <span>{user.phone || "No phone"}</span>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* PASSWORD */}
+                            <td className="py-3.5 px-4 align-middle">
+                              <div className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 px-2.5 py-1.5 rounded-xl transition-all shadow-2xs">
+                                <Lock size={12} className="text-emerald-700 shrink-0" />
+                                <span className="font-mono-code text-xs font-semibold text-slate-800 tracking-wider">
+                                  {visiblePasswords[user._id] ? (user.password || "••••••••") : "••••••••"}
+                                </span>
+                                {user.password && (
+                                  <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => togglePasswordVisibility(user._id)}
+                                      className="text-slate-400 hover:text-emerald-700 p-0.5 rounded transition-colors cursor-pointer"
+                                      title={visiblePasswords[user._id] ? "Hide password" : "Show password"}
+                                    >
+                                      {visiblePasswords[user._id] ? <EyeOff size={12} /> : <Eye size={12} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyPassword(user.password, user._id)}
+                                      className="text-slate-400 hover:text-emerald-700 p-0.5 rounded transition-colors cursor-pointer"
+                                      title={copiedId === user._id ? "Copied!" : "Copy password"}
+                                    >
+                                      {copiedId === user._id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* BUSINESS INFO */}
+                            <td className="py-3.5 px-4 align-middle">
+                              <div className="space-y-1">
+                                {user.businessName ? (
+                                  <>
+                                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate max-w-[170px]" title={user.businessName}>
+                                      <Building2 size={13} className="text-emerald-600 shrink-0" />
+                                      <span className="truncate">{user.businessName}</span>
+                                    </p>
+                                    {user.businessType && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200/80">
+                                        <Briefcase size={9} className="text-teal-600" />
+                                        {user.businessType}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-slate-400 font-medium italic flex items-center gap-1">
+                                    <Building2 size={12} className="text-slate-300" /> Not provided
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* JOINED ON */}
+                            <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                                <Calendar size={12} className="text-emerald-600 shrink-0" />
+                                <span>
+                                  {user._id ? new Date(parseInt(user._id.substring(0,8), 16) * 1000).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) : "Unknown"}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* ACTIONS (5 Clean Icons) */}
+                            <td className="py-3.5 pl-4 pr-6 align-middle text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* WhatsApp */}
+                                <button 
+                                  type="button"
+                                  onClick={() => handleOpenWhatsApp(user.phone, user.name)} 
+                                  className="p-2 rounded-xl bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 hover:border-[#25D366] transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95" 
+                                  title="Chat on WhatsApp"
+                                >
+                                  <FaWhatsapp size={14} />
+                                </button>
+
+                                {/* Change / Assign Plan */}
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    setPlanModalUser(user);
+                                    setSelectedPlan(user.subscriptionPlan || "One Month");
+                                    setPlanSuccessMsg("");
+                                  }} 
+                                  className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95" 
+                                  title="Change / Assign Plan"
+                                >
+                                  <Zap size={14} />
+                                </button>
+
+                                {/* View Profile & Credits */}
+                                <button 
+                                  onClick={() => handleView(user)} 
+                                  className="p-2 rounded-xl bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white border border-teal-200 hover:border-teal-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95" 
+                                  title="View Profile & Credits"
+                                >
+                                  <Eye size={14} />
+                                </button>
+
+                                {/* Edit User */}
+                                <button 
+                                  onClick={() => handleEditClick(user)} 
+                                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white border border-amber-200 hover:border-amber-500 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95" 
+                                  title="Edit User"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+
+                                {/* Delete User */}
+                                <button 
+                                  onClick={() => handleDelete(user._id)} 
+                                  className="p-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95" 
+                                  title="Delete User"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
-          
-          <div className="flex items-center justify-between px-6 py-4 bg-[#f4fcf7] border-t border-[#e6f7ef]">
-            <span className="text-sm text-gray-500 font-medium">Showing {filteredUsers.length} users</span>
-            <div className="flex gap-1">
-              <button className="p-1.5 rounded-lg hover:bg-[#e6f7ef] text-[#059669] transition"><ChevronLeft size={18}/></button>
-              <button className="p-1.5 rounded-lg hover:bg-[#e6f7ef] text-[#059669] transition"><ChevronRight size={18}/></button>
+
+          {/* Table Footer with Pagination */}
+          <div className="bg-emerald-50/50 px-6 py-3 border-t border-emerald-100/80 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 font-semibold">
+            <span>Showing {paginatedUsers.length} of {filteredUsers.length} total subscribers</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 mr-2">Page {currentPage} of {totalPages}</span>
+              <button 
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronLeft size={16}/>
+              </button>
+              <button 
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronRight size={16}/>
+              </button>
             </div>
           </div>
         </div>
+
       </main>
 
       {/* User Profile Modal */}
       {viewUser && (
-        <div className="fixed inset-0 md:left-[260px] z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 modal-overlay backdrop-blur-sm bg-black/40" onClick={() => setViewUser(null)}></div>
-          <div className="relative bg-gradient-to-b from-[#eef8f1] to-[#e6f4ea] rounded-3xl shadow-2xl w-full max-w-[460px] modal-content flex flex-col pb-8">
+        <div className="fixed inset-0 md:left-[260px] z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 backdrop-blur-md bg-slate-900/50 transition-opacity" onClick={() => setViewUser(null)}></div>
+          <div className="relative my-auto bg-white rounded-3xl shadow-2xl w-full max-w-[460px] max-h-[92vh] overflow-y-auto flex flex-col p-6 z-10 border border-emerald-200 [scrollbar-width:none]">
             
-            {/* Header */}
-            <div className="px-6 pt-5 pb-12 bg-[#22c55e] rounded-t-3xl text-white flex items-start justify-between relative z-10">
-              <div>
-                <h3 className="text-xl font-bold font-['Sora'] tracking-wide">User Profile</h3>
-                <p className="text-emerald-100 text-sm mt-0.5">{viewUser.name}</p>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl avatar-gradient flex items-center justify-center text-white text-xl font-extrabold shadow-md shadow-emerald-500/25">
+                  {viewUser.name ? viewUser.name.charAt(0).toUpperCase() : "U"}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">{viewUser.name}</h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Member since {viewUser._id ? new Date(parseInt(viewUser._id.substring(0,8), 16) * 1000).getFullYear() : "2026"}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setViewUser(null)} className="flex items-center gap-1 text-sm font-medium text-white/90 hover:text-white transition-colors">
-                Close <X size={16} strokeWidth={2.5} />
+              <button onClick={() => setViewUser(null)} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                <X size={18} />
               </button>
             </div>
 
-            {/* Avatar overlapping */}
-            <div className="flex flex-col items-center -mt-10 relative z-20">
-              <div className="w-[84px] h-[84px] rounded-full bg-[#86efac] border-4 border-[#eef8f1] flex items-center justify-center text-[#166534] text-4xl font-extrabold shadow-sm">
-                {viewUser.name ? viewUser.name.charAt(0).toUpperCase() : "U"}
+            {/* Profile Info Details */}
+            <div className="mt-4 space-y-2 bg-slate-50/80 rounded-2xl p-3 border border-slate-100">
+              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Mail size={13} className="text-emerald-600" /> Email
+                </span>
+                <span className="font-bold text-slate-800">{viewUser.email || "Not provided"}</span>
               </div>
-              <h4 className="text-[22px] font-bold text-[#064e3b] mt-2 font-['Sora']">{viewUser.name}</h4>
-              <p className="text-[11px] font-semibold text-[#166534] border border-[#166534]/40 rounded-full px-3 py-1 mt-1.5">
-                Member since {viewUser._id ? new Date(parseInt(viewUser._id.substring(0,8), 16) * 1000).getFullYear() : "2026"}
-              </p>
+              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Smartphone size={13} className="text-emerald-600" /> Phone
+                </span>
+                <span className="font-bold text-slate-800">{viewUser.phone || "Not provided"}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200/60">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Lock size={13} className="text-emerald-600" /> Password
+                </span>
+                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-800">
+                  <span>{visiblePasswords[`modal_${viewUser._id}`] ? (viewUser.password || "Not set") : "••••••••"}</span>
+                  {viewUser.password && (
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility(`modal_${viewUser._id}`)}
+                      className="text-slate-400 hover:text-emerald-700 p-0.5 cursor-pointer"
+                    >
+                      {visiblePasswords[`modal_${viewUser._id}`] ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs py-1.5">
+                <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                  <Building2 size={13} className="text-emerald-600" /> Business
+                </span>
+                <span className="font-bold text-slate-800">{viewUser.businessName || "Not provided"} ({viewUser.businessType || "N/A"})</span>
+              </div>
             </div>
 
-            {/* Content Body */}
-            <div className="px-7 mt-6">
-              
-              {/* Contact Info Card */}
-              <div className="bg-white/70 backdrop-blur-md rounded-[20px] p-2 shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-white mb-7">
-                <div className="flex items-center gap-4 p-3.5 border-b border-gray-100/60">
-                  <div className="w-8 h-8 rounded-[10px] bg-[#dcfce7] flex items-center justify-center text-[#16a34a] shadow-sm">
-                    <Mail size={16} strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1 flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-700">Email</p>
-                    <p className="text-sm font-semibold text-gray-900">{viewUser.email || "Not provided"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 p-3.5 border-b border-gray-100/60">
-                  <div className="w-8 h-8 rounded-[10px] bg-[#dcfce7] flex items-center justify-center text-[#16a34a] shadow-sm">
-                    <Smartphone size={16} strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1 flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-700">Phone</p>
-                    <p className="text-sm font-semibold text-gray-900">{viewUser.phone || "Not provided"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 p-3.5 border-b border-gray-100/60">
-                  <div className="w-8 h-8 rounded-[10px] bg-[#dcfce7] flex items-center justify-center text-[#16a34a] shadow-sm">
-                    <Building2 size={16} strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1 flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-700">Business</p>
-                    <p className="text-sm font-semibold text-gray-900">{viewUser.businessName || "Not provided"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 p-3.5">
-                  <div className="w-8 h-8 rounded-[10px] bg-[#dcfce7] flex items-center justify-center text-[#16a34a] shadow-sm">
-                    <Briefcase size={16} strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1 flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-700">Type</p>
-                    <p className="text-sm font-semibold text-gray-900">{viewUser.businessType || "N/A"}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Credits & Usage Section */}
-              <h5 className="text-[17px] font-bold text-[#166534] mb-3.5 tracking-tight font-['Sora']">Credits & Usage</h5>
-              
+            {/* Credits & Usage Stats */}
+            <div className="mt-5">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-2.5">Credits & Activity</h4>
               {statsLoading ? (
-                <div className="flex gap-3 animate-pulse">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="flex-1 h-32 bg-white/50 rounded-[20px]"></div>
-                  ))}
+                <div className="grid grid-cols-3 gap-2 animate-pulse">
+                  {[1,2,3].map(i => <div key={i} className="h-18 bg-emerald-50/60 rounded-xl"></div>)}
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  
-                  {/* Remaining Credits */}
-                  <div className="bg-[#e2f5e8] border border-[#a7f3d0] pt-3 pb-4 px-2 rounded-[20px] flex flex-col items-center justify-center relative shadow-sm hover:shadow-md transition-all group">
-                    <div className="absolute top-2.5 left-2.5 bg-white w-7 h-7 rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.06)] group-hover:scale-110 transition-transform">
-                      <Zap size={14} className="text-[#166534]" />
-                    </div>
-                    <p className="text-3xl font-extrabold text-[#064e3b] mt-7 tracking-tight font-['Sora']">{viewUserStats?.credits ?? '0'}</p>
-                    <p className="text-[10px] text-[#4b5563] mt-1 font-medium text-center">Remaining Credits</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 text-center">
+                    <p className="text-xl font-extrabold text-emerald-800">{viewUserStats?.credits ?? '0'}</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">Remaining</p>
                   </div>
-
-                  {/* Used Credits */}
-                  <div className="bg-[#e2f5e8] border border-[#a7f3d0] pt-3 pb-4 px-2 rounded-[20px] flex flex-col items-center justify-center relative shadow-sm hover:shadow-md transition-all group">
-                    <div className="absolute top-2.5 left-2.5 bg-white w-7 h-7 rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.06)] group-hover:scale-110 transition-transform">
-                      <Activity size={14} className="text-[#166534]" />
-                    </div>
-                    <p className="text-3xl font-extrabold text-[#064e3b] mt-7 tracking-tight font-['Sora']">{viewUserStats?.totalSent ?? '0'}</p>
-                    <p className="text-[10px] text-[#4b5563] mt-1 font-medium text-center">Used Credits</p>
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 text-center">
+                    <p className="text-xl font-extrabold text-teal-800">{viewUserStats?.totalSent ?? '0'}</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">Used</p>
                   </div>
-
-                  {/* Total Messages */}
-                  <div className="bg-[#e2f5e8] border border-[#a7f3d0] pt-3 pb-4 px-2 rounded-[20px] flex flex-col items-center justify-center relative shadow-sm hover:shadow-md transition-all group">
-                    <div className="absolute top-2.5 left-2.5 bg-white w-7 h-7 rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.06)] group-hover:scale-110 transition-transform">
-                      <MessageSquare size={14} className="text-[#166534]" />
-                    </div>
-                    <p className="text-3xl font-extrabold text-[#064e3b] mt-7 tracking-tight font-['Sora']">{(viewUserStats?.totalSent || 0) * 2}</p>
-                    <p className="text-[10px] text-[#4b5563] mt-1 font-medium text-center">Total Messages</p>
+                  <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 text-center">
+                    <p className="text-xl font-extrabold text-indigo-800">{(viewUserStats?.totalSent || 0) * 2}</p>
+                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">Messages</p>
                   </div>
-
                 </div>
               )}
             </div>
+
+            {/* Quick Action Button */}
+            <div className="mt-5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanModalUser(viewUser);
+                  setSelectedPlan(viewUser.subscriptionPlan || "One Month");
+                  setPlanSuccessMsg("");
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 transition cursor-pointer"
+              >
+                <Zap size={14} className="fill-white" /> Change Subscription Plan
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Change Plan Modal */}
+      {planModalUser && (
+        <div className="fixed inset-0 md:left-[260px] z-[110] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 backdrop-blur-md bg-slate-900/50 transition-opacity" onClick={() => !updatingPlan && setPlanModalUser(null)}></div>
+          <div className="relative my-auto bg-white rounded-3xl shadow-2xl w-full max-w-[460px] max-h-[92vh] overflow-y-auto flex flex-col p-6 z-10 border border-emerald-200 [scrollbar-width:none]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/25">
+                  <Zap size={20} className="fill-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Manage User Plan</h3>
+                  <p className="text-xs text-slate-500 font-medium truncate max-w-[240px]">{planModalUser.name} • {planModalUser.email}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => !updatingPlan && setPlanModalUser(null)} 
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Current Plan Status Box */}
+            <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Current Active Plan</span>
+                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                  planModalUser.isSubscribed && planModalUser.subscriptionExpiresAt && new Date(planModalUser.subscriptionExpiresAt).getTime() > Date.now()
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                    : "bg-amber-100 text-amber-800 border border-amber-300"
+                }`}>
+                  {planModalUser.isSubscribed && planModalUser.subscriptionExpiresAt && new Date(planModalUser.subscriptionExpiresAt).getTime() > Date.now()
+                    ? `Active (${planModalUser.subscriptionPlan || "Subscribed"})`
+                    : "Expired / Inactive"}
+                </span>
+              </div>
+
+              {planModalUser.subscriptionExpiresAt && (
+                <div className="mt-2 text-xs text-slate-600 flex items-center gap-1.5">
+                  <Calendar size={12} className="text-emerald-600" />
+                  <span>Expires on: <strong>{new Date(planModalUser.subscriptionExpiresAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</strong></span>
+                </div>
+              )}
+
+              {planModalUser.upcomingPlan && (
+                <div className="mt-2 pt-2 border-t border-emerald-200/60 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 flex items-center gap-1">
+                    <Clock size={12} className="text-blue-500" /> Queued Next:
+                  </span>
+                  <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                    {planModalUser.upcomingPlan}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Plan Selector */}
+            <div className="mt-4 space-y-1.5">
+              <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Select New Plan</label>
+              <select
+                value={selectedPlan}
+                onChange={(e) => setSelectedPlan(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all cursor-pointer"
+              >
+                <option value="One Day">⚡ One Day (24 Hours)</option>
+                <option value="One Week">📅 One Week (7 Days)</option>
+                <option value="15 Days">🌟 15 Days Access</option>
+                <option value="One Month">💎 One Month (30 Days)</option>
+                <option value="3 Months">🚀 3 Months (90 Days)</option>
+                <option value="6 Months">👑 6 Months (180 Days)</option>
+                <option value="1 Year">🏆 1 Year (365 Days Premium)</option>
+              </select>
+            </div>
+
+            {/* Dynamic Status / Behavior Banner */}
+            <div className="mt-4 p-3.5 rounded-2xl border text-xs leading-relaxed transition-all">
+              {planModalUser.isSubscribed && planModalUser.subscriptionExpiresAt && new Date(planModalUser.subscriptionExpiresAt).getTime() > Date.now() ? (
+                <div className="bg-blue-50 border-blue-200 text-blue-800 -m-3.5 p-3.5 rounded-2xl">
+                  <p className="font-bold flex items-center gap-1.5 text-blue-900">
+                    <Clock size={14} className="text-blue-600 shrink-0" />
+                    Automatic Queueing Enabled
+                  </p>
+                  <p className="mt-1 text-blue-700 text-[11px]">
+                    This user currently has an active plan. The new <strong>{selectedPlan}</strong> plan will be placed in their queue and will activate automatically when the current plan expires.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-emerald-50 border-emerald-200 text-emerald-800 -m-3.5 p-3.5 rounded-2xl">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-900">
+                    <Sparkles size={14} className="text-emerald-600 shrink-0" />
+                    Immediate Activation
+                  </p>
+                  <p className="mt-1 text-emerald-700 text-[11px]">
+                    This user has no active plan. The new <strong>{selectedPlan}</strong> plan will activate immediately today with 99,999 credits and full subscribed features.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Success Feedback */}
+            {planSuccessMsg && (
+              <div className="mt-4 p-3 rounded-xl bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                <Check size={16} className="text-emerald-600" />
+                <span>{planSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPlanModalUser(null)}
+                disabled={updatingPlan}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyPlan}
+                disabled={updatingPlan}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition cursor-pointer flex items-center gap-2 disabled:opacity-50 active:scale-95"
+              >
+                {updatingPlan ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Applying...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} /> Confirm & Apply Plan
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}

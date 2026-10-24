@@ -45,8 +45,10 @@ export const NotificationProvider = ({ children }) => {
           setUnreadCount(unread);
 
           const hasApprovalNotif = sorted.some(n => 
-            n.type === 'request_approved' || 
-            (n.title && (n.title.includes('Activated') || n.title.includes('Queued') || n.title.includes('Approved')))
+            !n.read && (
+              n.type === 'request_approved' || 
+              (n.title && (n.title.includes('Activated') || n.title.includes('Queued') || n.title.includes('Approved')))
+            )
           );
           const isFreeUserActive = !!localStorage.getItem('freeUserToken') || !!localStorage.getItem('freeUserData');
           if (!isFreeUserActive && hasApprovalNotif && localStorage.getItem('isSubscribed') !== 'true') {
@@ -91,24 +93,6 @@ export const NotificationProvider = ({ children }) => {
       if (response.ok) {
         const data = await response.json();
 
-        if (isFreeUser) {
-          const fc = Math.max(0, data.credits !== undefined ? Number(data.credits) : 0);
-          setCredits(fc);
-          localStorage.setItem('credits', String(fc));
-          localStorage.removeItem('isSubscribed');
-          localStorage.removeItem('subscriptionPlan');
-          localStorage.removeItem('subscriptionStartedAt');
-          localStorage.removeItem('subscriptionExpiresAt');
-          if (freeUserData) {
-            freeUserData.isSubscribed = false;
-            freeUserData.subscriptionPlan = '';
-            freeUserData.credits = fc;
-            localStorage.setItem('freeUserData', JSON.stringify(freeUserData));
-          }
-          window.dispatchEvent(new Event('creditsChanged'));
-          return;
-        }
-
         const isStillValid = !!(
           data.isSubscribed &&
           (
@@ -118,6 +102,10 @@ export const NotificationProvider = ({ children }) => {
         );
 
         if (isStillValid) {
+          // User has an active paid subscription: Auto-purge stale free user data permanently
+          localStorage.removeItem('freeUserToken');
+          localStorage.removeItem('freeUserData');
+          localStorage.setItem('isLoggedIn', 'true');
           setCredits(99999);
           localStorage.setItem('isSubscribed', 'true');
           localStorage.setItem('subscriptionPlan', data.subscriptionPlan || 'One Day');
@@ -144,6 +132,26 @@ export const NotificationProvider = ({ children }) => {
           }
           localStorage.setItem('credits', '99999');
           localStorage.removeItem('freeTrialEnded');
+          window.dispatchEvent(new Event('creditsChanged'));
+          window.dispatchEvent(new Event('freeUserLoginStatusChanged'));
+          window.dispatchEvent(new Event('loginStatusChanged'));
+          return;
+        }
+
+        if (isFreeUser && !data.isSubscribed) {
+          const fc = Math.max(0, data.credits !== undefined ? Number(data.credits) : 0);
+          setCredits(fc);
+          localStorage.setItem('credits', String(fc));
+          localStorage.removeItem('isSubscribed');
+          localStorage.removeItem('subscriptionPlan');
+          localStorage.removeItem('subscriptionStartedAt');
+          localStorage.removeItem('subscriptionExpiresAt');
+          if (freeUserData) {
+            freeUserData.isSubscribed = false;
+            freeUserData.subscriptionPlan = '';
+            freeUserData.credits = fc;
+            localStorage.setItem('freeUserData', JSON.stringify(freeUserData));
+          }
           window.dispatchEvent(new Event('creditsChanged'));
           return;
         } else {
@@ -283,10 +291,13 @@ export const NotificationProvider = ({ children }) => {
 
       const expiryTicker = setInterval(() => {
         const expiresAt = localStorage.getItem('subscriptionExpiresAt');
+        const upcomingExp = localStorage.getItem('upcomingPlanExpiresAt');
         const isSub = localStorage.getItem('isSubscribed') === 'true';
-        if (isSub && expiresAt && expiresAt !== 'null') {
-          const expTime = new Date(expiresAt).getTime();
-          if (!isNaN(expTime) && expTime <= Date.now()) {
+        if (isSub && (expiresAt || upcomingExp)) {
+          const effectiveTime = (upcomingExp && new Date(upcomingExp).getTime() > (expiresAt ? new Date(expiresAt).getTime() : 0))
+            ? new Date(upcomingExp).getTime()
+            : (expiresAt ? new Date(expiresAt).getTime() : 0);
+          if (effectiveTime > 0 && effectiveTime <= Date.now()) {
             localStorage.setItem('isSubscribed', 'false');
             localStorage.removeItem('subscriptionPlan');
             localStorage.setItem('credits', '0');
@@ -348,9 +359,12 @@ export const NotificationProvider = ({ children }) => {
     const checkExpiry = () => {
       const isSub = localStorage.getItem('isSubscribed') === 'true';
       const expiresAt = localStorage.getItem('subscriptionExpiresAt');
-      if (isSub && expiresAt) {
-        const expiryDate = new Date(expiresAt);
-        if (expiryDate.getTime() <= Date.now()) {
+      const upcomingExp = localStorage.getItem('upcomingPlanExpiresAt');
+      if (isSub && (expiresAt || upcomingExp)) {
+        const effectiveTime = (upcomingExp && new Date(upcomingExp).getTime() > (expiresAt ? new Date(expiresAt).getTime() : 0))
+          ? new Date(upcomingExp).getTime()
+          : (expiresAt ? new Date(expiresAt).getTime() : 0);
+        if (effectiveTime > 0 && effectiveTime <= Date.now()) {
           if (!alreadyExpiredTriggered) {
             alreadyExpiredTriggered = true;
             console.log('⏰ Subscription expired! Deactivating plan immediately.');
@@ -358,6 +372,9 @@ export const NotificationProvider = ({ children }) => {
             localStorage.removeItem('subscriptionPlan');
             localStorage.removeItem('subscriptionStartedAt');
             localStorage.removeItem('subscriptionExpiresAt');
+            localStorage.removeItem('upcomingPlan');
+            localStorage.removeItem('upcomingPlanStartsAt');
+            localStorage.removeItem('upcomingPlanExpiresAt');
             localStorage.setItem('credits', '0');
             setCredits(0);
             window.dispatchEvent(new Event('creditsChanged'));

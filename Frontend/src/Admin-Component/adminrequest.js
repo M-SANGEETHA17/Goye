@@ -1,36 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search, Check, X, Eye, Clock,
   IndianRupee, Crown, Zap, Building2, Smartphone, ChevronLeft, ChevronRight,
-  FileText, ShieldCheck, Mail, Calendar, CreditCard, Phone, Image, ZoomIn
+  FileText, ShieldCheck, Mail, Calendar, CreditCard, Phone, Image, ZoomIn,
+  RefreshCw, CheckCircle2, XCircle, AlertCircle, Sparkles, ExternalLink, Copy
 } from "lucide-react";
+
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/+$/, "");
 
 const getPlanMeta = (planName = '') => {
   const lower = (planName || '').toLowerCase();
   if (lower.includes('one day') || lower.includes('1 day') || lower === 'oneday' || lower === 'day') {
-    return { label: 'One Day', color: "#34d399", bg: "#ecfdf5", icon: Zap, price: 49 };
+    return { label: 'One Day', color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0", icon: Zap, price: 49 };
   } else if (lower.includes('one week') || lower.includes('1 week') || lower.includes('week')) {
-    return { label: 'One Week', color: "#38bdf8", bg: "#f0f9ff", icon: Zap, price: 249 };
+    return { label: 'One Week', color: "#0284c7", bg: "#f0f9ff", border: "#bae6fd", icon: Zap, price: 249 };
   } else if (lower.includes('15') || lower.includes('fifteen')) {
-    return { label: '15 Days', color: "#fb923c", bg: "#fff7ed", icon: Zap, price: 499 };
+    return { label: '15 Days', color: "#ea580c", bg: "#fff7ed", border: "#fed7aa", icon: Zap, price: 499 };
   } else if (lower.includes('3 month') || lower.includes('three')) {
-    return { label: 'Three Months', color: "#06b6d4", bg: "#ecfeff", icon: Crown, price: 1999 };
+    return { label: 'Three Months', color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", icon: Crown, price: 1999 };
   } else if (lower.includes('6 month') || lower.includes('six')) {
-    return { label: 'Six Months', color: "#a855f7", bg: "#faf5ff", icon: Crown, price: 3499 };
+    return { label: 'Six Months', color: "#9333ea", bg: "#faf5ff", border: "#e9d5ff", icon: Crown, price: 3499 };
   } else if (lower.includes('18 month') || lower.includes('eighteen')) {
-    return { label: '18 Months', color: "#f43f5e", bg: "#fff1f2", icon: Crown, price: 7299 };
+    return { label: '18 Months', color: "#e11d48", bg: "#fff1f2", border: "#fecdd3", icon: Crown, price: 7299 };
   } else if (lower.includes('year') || lower.includes('1 yr')) {
-    return { label: 'One Year', color: "#f59e0b", bg: "#fffbeb", icon: Crown, price: 5999 };
+    return { label: 'One Year', color: "#d97706", bg: "#fffbeb", border: "#fde68a", icon: Crown, price: 5999 };
   } else if (lower.includes('month')) {
-    return { label: 'One Month', color: "#10b981", bg: "#ecfdf5", icon: Building2, price: 799 };
+    return { label: 'One Month', color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: Building2, price: 799 };
   } else if (lower.includes('silver')) {
-    return { label: 'Silver', color: "#71717a", bg: "#f4f4f5", icon: Zap, price: 299 };
+    return { label: 'Silver', color: "#52525b", bg: "#f4f4f5", border: "#e4e4e7", icon: Zap, price: 299 };
   } else if (lower.includes('gold')) {
-    return { label: 'Gold', color: "#d97706", bg: "#fef3c7", icon: Building2, price: 599 };
+    return { label: 'Gold', color: "#b45309", bg: "#fef3c7", border: "#fde68a", icon: Building2, price: 599 };
   } else if (lower.includes('demo')) {
-    return { label: 'Demo Access', color: "#00F5D4", bg: "#ecfdf5", icon: Zap, price: 0 };
+    return { label: 'Demo Access', color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", icon: Zap, price: 0 };
   } else {
-    return { label: planName || 'Custom Plan', color: "#34d399", bg: "#ecfdf5", icon: Crown, price: 49 };
+    return { label: planName || 'Custom Plan', color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: Crown, price: 49 };
   }
 };
 
@@ -40,14 +43,20 @@ export default function SubscriptionRequests() {
   const [filter, setFilter] = useState("Pending");
   const [requests, setRequests] = useState([]);
   const [query, setQuery] = useState("");
-  const [selectedRequest, setSelectedRequest] = useState(null); // For Eye Icon Modal
-  const [confirmAction, setConfirmAction] = useState(null); // For Approve/Reject Confirmation Modal
-  const [previewImage, setPreviewImage] = useState(null); // For full-screen screenshot preview modal
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(null);
 
-  const fetchRequests = async () => {
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const fetchRequests = async (showAnim = false) => {
+    if (showAnim) setIsRefreshing(true);
     try {
-      const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
-      const response = await fetch(`${apiBaseUrl}/api/subscription-requests`);
+      const response = await fetch(`${API_BASE_URL}/api/subscription-requests`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -56,14 +65,18 @@ export default function SubscriptionRequests() {
       }
     } catch (err) {
       console.error("Error fetching subscription requests:", err);
+    } finally {
+      if (showAnim) {
+        setTimeout(() => setIsRefreshing(false), 500);
+      }
     }
   };
 
   useEffect(() => {
-    fetchRequests();
-    const interval = setInterval(fetchRequests, 2000);
-    const handleFocus = () => fetchRequests();
-    const handleSync = () => fetchRequests();
+    fetchRequests(false);
+    const interval = setInterval(() => fetchRequests(false), 4000);
+    const handleFocus = () => fetchRequests(false);
+    const handleSync = () => fetchRequests(false);
     window.addEventListener("focus", handleFocus);
     window.addEventListener("storage", handleSync);
     window.addEventListener("gy:subscription-request-created", handleSync);
@@ -77,8 +90,7 @@ export default function SubscriptionRequests() {
 
   const updateStatus = async (id, status) => {
     try {
-      const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
-      const response = await fetch(`${apiBaseUrl}/api/subscription-requests/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/subscription-requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -100,26 +112,49 @@ export default function SubscriptionRequests() {
     }
   };
 
-  // Create sequential IDs based on all requests ordered chronologically
-  const sortedByCreatedAtAsc = [...requests].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
-  const seqIdMap = {};
-  sortedByCreatedAtAsc.forEach((req, index) => {
-      if (req._id) {
-          seqIdMap[req._id] = `REQ-${String(index + 1).padStart(3, '0')}`;
-      }
-  });
+  const copyToClipboard = (text, id) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedUpi(id);
+    setTimeout(() => setCopiedUpi(null), 2000);
+  };
 
-  const filtered = requests
-    .filter((r) => {
-      const matchesFilter = filter === "All" || r.status === filter.toLowerCase();
-      const matchesQuery = 
-        (r.name || "").toLowerCase().includes(query.toLowerCase()) || 
-        (r.email || "").toLowerCase().includes(query.toLowerCase()) || 
-        (r.plan || "").toLowerCase().includes(query.toLowerCase()) ||
-        (r.upiId || "").toLowerCase().includes(query.toLowerCase());
-      return matchesFilter && matchesQuery;
-    })
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  // Create sequential IDs based on all requests ordered chronologically
+  const sortedByCreatedAtAsc = useMemo(() => {
+    return [...requests].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  }, [requests]);
+
+  const seqIdMap = useMemo(() => {
+    const map = {};
+    sortedByCreatedAtAsc.forEach((req, index) => {
+      if (req._id) {
+        map[req._id] = `REQ-${String(index + 1).padStart(3, '0')}`;
+      }
+    });
+    return map;
+  }, [sortedByCreatedAtAsc]);
+
+  const filtered = useMemo(() => {
+    return requests
+      .filter((r) => {
+        const matchesFilter = filter === "All" || r.status === filter.toLowerCase();
+        const matchesQuery = 
+          (r.name || "").toLowerCase().includes(query.toLowerCase()) || 
+          (r.email || "").toLowerCase().includes(query.toLowerCase()) || 
+          (r.plan || "").toLowerCase().includes(query.toLowerCase()) ||
+          (r.upiId || "").toLowerCase().includes(query.toLowerCase()) ||
+          (r._id && seqIdMap[r._id] && seqIdMap[r._id].toLowerCase().includes(query.toLowerCase()));
+        return matchesFilter && matchesQuery;
+      })
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [requests, filter, query, seqIdMap]);
+
+  // Paginated items
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const paginatedRequests = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage]);
 
   const counts = {
     All: requests.length,
@@ -128,12 +163,14 @@ export default function SubscriptionRequests() {
     Rejected: requests.filter((r) => r.status === "rejected").length,
   };
 
-  // Dynamically compute KPIs from the requests array
-  const totalRevenue = requests
-    .filter(r => r.status === "approved")
-    .reduce((sum, r) => sum + getPlanMeta(r.plan).price, 0);
+  const totalRevenue = useMemo(() => {
+    return requests
+      .filter(r => r.status === "approved")
+      .reduce((sum, r) => sum + getPlanMeta(r.plan).price, 0);
+  }, [requests]);
 
   const isToday = (dateString) => {
+    if (!dateString) return false;
     const d = new Date(dateString);
     const today = new Date();
     return d.getDate() === today.getDate() &&
@@ -143,134 +180,250 @@ export default function SubscriptionRequests() {
 
   const approvedTodayCount = requests.filter(r => r.status === "approved" && isToday(r.createdAt)).length;
 
-  const dynamicKpis = [
-    { label: "Total Requests", value: requests.length.toString(), icon: FileText, color: "#10B981", bg: "#e6f7ef" },
-    { label: "Pending Approval", value: counts.Pending.toString(), icon: Clock, color: "#f59e0b", bg: "#fffbeb" },
-    { label: "Approved Today", value: approvedTodayCount.toString(), icon: ShieldCheck, color: "#3b82f6", bg: "#eff6ff" },
-    { label: "Revenue (MTD)", value: `₹${totalRevenue.toLocaleString()}`, icon: IndianRupee, color: "#059669", bg: "#d1fae5" },
-  ];
-
   return (
-    <div className="min-h-screen bg-[#f4fcf7] font-sans text-gray-800 relative overflow-hidden admin-main-content">
+    <div className="min-h-screen bg-gradient-to-br from-[#f0fdf4] via-[#f8fafc] to-[#ecfdf5] font-sans text-slate-800 relative overflow-x-hidden admin-main-content">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
         * { font-family: 'Plus Jakarta Sans', sans-serif; }
-        
-        .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .dash-card {
-          background: #ffffff;
+        .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(14px);
+          border: 1px solid rgba(16, 185, 129, 0.16);
+          box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
           border-radius: 20px;
-          border: 1px solid rgba(16, 185, 129, 0.15);
-          box-shadow: 0 4px 24px -10px rgba(16, 185, 129, 0.1);
-          transition: all 0.3s ease;
         }
-        .dash-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 32px -12px rgba(16, 185, 129, 0.25);
-          border-color: rgba(16, 185, 129, 0.4);
+
+        .stat-card-glow {
+          position: relative;
+          overflow: hidden;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        
-        .modal-overlay {
-          background: rgba(6, 78, 59, 0.4);
-          backdrop-filter: blur(4px);
-          animation: fadeIn 0.2s ease-out;
+        .stat-card-glow:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 14px 34px -8px rgba(16, 185, 129, 0.16);
         }
-        .modal-content {
-          animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+        .custom-scroll::-webkit-scrollbar {
+          height: 6px;
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes scaleUp { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .custom-scroll::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 9999px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+          background: #a7f3d0;
+          border-radius: 9999px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+          background: #10B981;
+        }
+
+        .avatar-gradient {
+          background: linear-gradient(135deg, #10B981 0%, #059669 50%, #047857 100%);
+        }
       `}</style>
 
-      {/* Header */}
-      <header className="w-full pl-16 pr-4 md:px-8 py-4 bg-white/80 backdrop-blur-md border-b border-[#a7f3d0]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#10B981] to-[#047857] flex items-center justify-center shadow-lg shadow-[#10B981]/30">
-              <FileText className="text-white" size={20} />
+      {/* Top Banner / Header */}
+      <header className="sticky top-0 z-30 w-full bg-white/85 backdrop-blur-md border-b border-emerald-100/80 px-4 md:px-8 py-4 transition-all">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl avatar-gradient flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/20">
+              <FileText size={22} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-[#064e3b]">Subscription Requests</h1>
-              <p className="text-xs text-[#059669] font-medium">Manage and review user upgrades</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Subscription Requests</h1>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Realtime Payments
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Review UPI payment proofs, verify receipts, and grant plan access</p>
             </div>
           </div>
-          <div className="flex items-center gap-5">
-            <a href="/messages" className="text-xs font-bold text-[#059669] hover:underline">← Go Back to App</a>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchRequests(true)}
+              disabled={isRefreshing}
+              className="px-3.5 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
+              title="Refresh requests"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-emerald-600" : ""} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+            <a 
+              href="/messages" 
+              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all border border-emerald-200 flex items-center gap-1.5"
+            >
+              <span>Back to App</span>
+              <ExternalLink size={13} />
+            </a>
           </div>
         </div>
       </header>
 
-      <main className="p-8 max-w-7xl mx-auto space-y-8">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 slide-up" style={{ animationDelay: '0.1s' }}>
-          {dynamicKpis.map((kpi, i) => (
-            <div key={i} className="dash-card p-6 flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: kpi.bg, color: kpi.color }}>
-                <kpi.icon size={28} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-500">{kpi.label}</p>
-                <p className="text-2xl font-bold text-[#064e3b] mt-1">{kpi.value}</p>
-              </div>
+      {/* Main Content Area */}
+      <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+        
+        {/* Top KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+          {/* Total Requests */}
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-emerald-500">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Requests</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 mt-1">{requests.length}</h3>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">All incoming upgrades</p>
             </div>
-          ))}
-        </div>
-
-        {/* Requests Table Card */}
-        <div className="dash-card slide-up overflow-hidden" style={{ animationDelay: '0.2s' }}>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 p-3.5 sm:p-6 border-b border-[#e6f7ef]">
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-[#f4fcf7] border border-[#a7f3d0] rounded-xl p-1 overflow-x-auto max-w-full [scrollbar-width:none]">
-              {filters.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 sm:px-4 py-1.5 rounded-lg font-semibold text-xs sm:text-sm transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer ${
-                    filter === f ? "bg-[#10B981] text-white shadow-md" : "text-gray-500 hover:text-[#064e3b]"
-                  }`}
-                >
-                  {f}
-                  <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full ${filter === f ? "bg-white/20" : "bg-[#d1fae5] text-[#10B981]"}`}>
-                    {counts[f]}
-                  </span>
-                </button>
-              ))}
-            </div>
-            
-            <div className="flex items-center gap-2 bg-[#f4fcf7] border border-[#a7f3d0] focus-within:border-[#10B981] rounded-xl px-3.5 sm:px-4 py-2 sm:py-2.5 w-full sm:w-72 transition-colors">
-              <Search size={16} className="text-[#059669] shrink-0" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search requests..."
-                className="bg-transparent text-xs sm:text-sm font-medium text-[#064e3b] outline-none w-full placeholder:text-gray-400"
-              />
+            <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center ring-1 ring-emerald-200/60 shadow-xs">
+              <FileText size={26} />
             </div>
           </div>
 
-          <div className="overflow-x-auto [scrollbar-width:none]">
-            <table className="w-full text-left border-collapse min-w-[680px] sm:min-w-full">
+          {/* Pending Approval */}
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-amber-500">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Review</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-amber-900 mt-1">{counts.Pending}</h3>
+              <p className="text-[11px] text-amber-600 font-semibold mt-1 flex items-center gap-1">
+                {counts.Pending > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>}
+                <span>Requires verification</span>
+              </p>
+            </div>
+            <div className="w-13 h-13 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center ring-1 ring-amber-200/60 shadow-xs">
+              <Clock size={26} />
+            </div>
+          </div>
+
+          {/* Approved Today */}
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-teal-500">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Approved Today</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-teal-900 mt-1">{approvedTodayCount}</h3>
+              <p className="text-[11px] text-teal-600 font-semibold mt-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                <span>Completed today</span>
+              </p>
+            </div>
+            <div className="w-13 h-13 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center ring-1 ring-teal-200/60 shadow-xs">
+              <ShieldCheck size={26} />
+            </div>
+          </div>
+
+          {/* Revenue (MTD) */}
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-emerald-600">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Approved Revenue</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-emerald-950 mt-1">₹{totalRevenue.toLocaleString()}</h3>
+              <p className="text-[11px] text-emerald-700 font-semibold mt-1">Verified upgrade value</p>
+            </div>
+            <div className="w-13 h-13 rounded-2xl bg-emerald-100/70 text-emerald-800 flex items-center justify-center ring-1 ring-emerald-300/60 shadow-xs">
+              <IndianRupee size={26} />
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Pills & Search Bar */}
+        <div className="glass-card p-4 md:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
+          {/* Status Filters */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+            {filters.map((f) => {
+              const active = filter === f;
+              const count = counts[f];
+              let activeClass = "bg-emerald-600 text-white shadow-md shadow-emerald-600/20";
+              let badgeActiveClass = "bg-emerald-800 text-emerald-100";
+              
+              if (f === "Pending" && active) {
+                activeClass = "bg-amber-500 text-white shadow-md shadow-amber-500/20";
+                badgeActiveClass = "bg-amber-700 text-amber-100";
+              } else if (f === "Rejected" && active) {
+                activeClass = "bg-rose-600 text-white shadow-md shadow-rose-600/20";
+                badgeActiveClass = "bg-rose-800 text-rose-100";
+              }
+
+              return (
+                <button
+                  key={f}
+                  onClick={() => {
+                    setFilter(f);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    active
+                      ? activeClass
+                      : "bg-slate-100/90 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                  }`}
+                >
+                  <span>{f}</span>
+                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
+                    active ? badgeActiveClass : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-sm">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by name, email, plan, UPI, ID..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-emerald-200/80 bg-white/90 text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none focus:border-emerald-500 focus:ring-3 focus:ring-emerald-500/15 transition-all shadow-2xs"
+            />
+            {query && (
+              <button 
+                onClick={() => setQuery("")} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Requests Table Container */}
+        <div className="glass-card overflow-hidden border border-emerald-200/70 shadow-sm">
+          <div className="overflow-x-auto custom-scroll">
+            <table className="w-full text-left border-collapse min-w-[980px]">
               <thead>
-                <tr className="bg-[#f4fcf7] text-gray-500 text-sm font-semibold uppercase tracking-wider">
-                  <th className="px-6 py-4">Request ID</th>
-                  <th className="px-6 py-4">User Details</th>
-                  <th className="px-6 py-4">Plan & Amount</th>
-                  <th className="px-6 py-4">UPI ID</th>
-                  <th className="px-6 py-4">Screenshot</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                <tr className="bg-gradient-to-r from-emerald-50/90 to-teal-50/60 border-b border-emerald-100 text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider">
+                  <th className="py-4 pl-6 pr-4 w-[130px]">Request ID</th>
+                  <th className="py-4 px-4 w-[240px]">User Details</th>
+                  <th className="py-4 px-4 w-[160px]">Plan & Amount</th>
+                  <th className="py-4 px-4 w-[170px]">UPI Ref / ID</th>
+                  <th className="py-4 px-4 w-[120px]">Screenshot</th>
+                  <th className="py-4 px-4 w-[170px]">Status</th>
+                  <th className="py-4 pl-4 pr-6 text-right w-[150px]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e6f7ef]">
-                {filtered.length === 0 ? (
+              <tbody className="divide-y divide-emerald-50/80 bg-white/70">
+                {paginatedRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
-                      No {filter.toLowerCase()} requests match your search.
+                    <td colSpan={7} className="py-16 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
+                          <FileText size={28} />
+                        </div>
+                        <span className="text-base font-bold text-slate-800">No {filter} Requests</span>
+                        <p className="text-xs text-slate-400">
+                          {query ? `No requests match "${query}". Try searching another name or UPI ID.` : `There are currently no ${filter.toLowerCase()} subscription requests.`}
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((r, i) => {
+                  paginatedRequests.map((r) => {
                     const planMeta = getPlanMeta(r.plan);
                     const reqId = r._id && seqIdMap[r._id] ? seqIdMap[r._id] : 'REQ-NEW';
                     const requestDate = r.createdAt 
@@ -279,109 +432,155 @@ export default function SubscriptionRequests() {
                     const requestTime = r.createdAt 
                       ? new Date(r.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
                       : '';
+                    const PlanIcon = planMeta.icon;
 
                     return (
-                      <tr key={r._id} className="hover:bg-[#fcfdfd] transition-colors group">
-                        <td className="px-6 py-4 text-sm font-bold text-[#10B981]">{reqId}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#10B981] to-[#6ee7b7] flex items-center justify-center text-white font-bold shadow-sm">
-                              {(r.name || 'U').charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-bold text-[#064e3b]">{r.name}</p>
-                              <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><Mail size={12}/> {r.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md" style={{ background: planMeta.bg, color: planMeta.color }}>
-                              <planMeta.icon size={10} /> {r.plan}
-                            </span>
-                          </div>
-                          <p className="text-sm font-bold text-[#064e3b]">₹{planMeta.price}</p>
+                      <tr key={r._id} className="hover:bg-emerald-50/35 transition-all duration-150 group border-b border-slate-100 last:border-none">
+                        
+                        {/* REQUEST ID */}
+                        <td className="py-3.5 pl-6 pr-4 align-middle">
+                          <span className="font-mono-code text-xs font-extrabold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                            {reqId}
+                          </span>
                         </td>
 
-                        {/* UPI ID Column */}
-                        <td className="px-6 py-4">
+                        {/* USER DETAILS */}
+                        <td className="py-3.5 px-4 align-middle">
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              <div className="w-10 h-10 rounded-xl avatar-gradient flex items-center justify-center text-white font-extrabold text-sm shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                                {(r.name || 'U').charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+                            <div className="min-w-0 pr-1">
+                              <p className="font-bold text-slate-800 text-[13px] truncate group-hover:text-emerald-700 transition-colors" title={r.name}>
+                                {r.name || "Unnamed"}
+                              </p>
+                              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5 truncate max-w-[170px]" title={r.email}>
+                                <Mail size={12} className="text-emerald-600 shrink-0" />
+                                <span className="truncate">{r.email}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* PLAN & AMOUNT */}
+                        <td className="py-3.5 px-4 align-middle">
+                          <div className="space-y-1">
+                            <span 
+                              className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-md border" 
+                              style={{ background: planMeta.bg, color: planMeta.color, borderColor: planMeta.border }}
+                            >
+                              <PlanIcon size={11} />
+                              {planMeta.label}
+                            </span>
+                            <p className="text-xs font-extrabold text-slate-900 flex items-center">
+                              ₹{planMeta.price}
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* UPI ID */}
+                        <td className="py-3.5 px-4 align-middle">
                           {r.upiId ? (
-                            <div className="flex items-center gap-1.5 bg-[#f4fcf7] border border-[#a7f3d0] px-2.5 py-1 rounded-lg w-fit">
-                              <CreditCard size={13} className="text-[#059669]" />
-                              <span className="text-xs font-bold text-[#064e3b] font-mono">{r.upiId}</span>
+                            <div className="inline-flex items-center gap-1.5 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 px-2.5 py-1 rounded-xl transition-all shadow-2xs group/upi">
+                              <CreditCard size={12} className="text-emerald-600 shrink-0" />
+                              <span className="font-mono-code text-[11px] font-bold text-slate-800 truncate max-w-[120px]" title={r.upiId}>
+                                {r.upiId}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(r.upiId, r._id)}
+                                className="text-slate-400 hover:text-emerald-700 p-0.5 rounded cursor-pointer"
+                                title={copiedUpi === r._id ? "Copied UPI!" : "Copy UPI ID"}
+                              >
+                                {copiedUpi === r._id ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                              </button>
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-400 font-medium italic">N/A</span>
+                            <span className="text-xs text-slate-400 font-medium italic">N/A</span>
                           )}
                         </td>
 
-                        {/* Payment Screenshot Thumbnail Column */}
-                        <td className="px-6 py-4">
+                        {/* PAYMENT SCREENSHOT */}
+                        <td className="py-3.5 px-4 align-middle">
                           {r.screenshot ? (
-                            <button 
+                            <button
+                              type="button"
                               onClick={() => setPreviewImage(r.screenshot)}
-                              className="relative group/thumb block rounded-xl overflow-hidden border border-[#a7f3d0] hover:border-[#10B981] shadow-sm transition-all focus:outline-none cursor-pointer"
-                              title="Click to view full screenshot"
+                              className="relative group/thumb block rounded-xl overflow-hidden border border-emerald-200 hover:border-emerald-500 shadow-2xs transition-all focus:outline-none cursor-pointer"
+                              title="Click to enlarge payment screenshot"
                             >
                               <img 
                                 src={r.screenshot} 
                                 alt="Payment proof" 
-                                className="w-12 h-12 object-cover rounded-xl group-hover/thumb:scale-105 transition-transform" 
+                                className="w-10 h-10 object-cover rounded-xl group-hover/thumb:scale-110 transition-transform duration-200" 
                                 onError={(e) => {
                                   e.target.style.display = 'none';
                                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                                 }}
                               />
-                              <div className="hidden w-12 h-12 bg-gray-100 rounded-xl items-center justify-center text-gray-400 text-[10px] font-bold">
+                              <div className="hidden w-10 h-10 bg-slate-100 rounded-xl items-center justify-center text-slate-400 text-[9px] font-bold">
                                 Invalid
                               </div>
-                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white transition-opacity">
-                                <ZoomIn size={15} />
+                              <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                <ZoomIn size={14} />
                               </div>
                             </button>
                           ) : (
-                            <span className="text-xs text-gray-400 font-medium italic flex items-center gap-1">
-                              <Image size={12} className="text-gray-300" /> No image
+                            <span className="text-xs text-slate-400 font-medium italic flex items-center gap-1">
+                              <Image size={12} className="text-slate-300" /> No image
                             </span>
                           )}
                         </td>
 
-                        {/* Status Column */}
-                        <td className="px-6 py-4">
-                          <StatusBadge status={r.status} />
-                          <p className="text-xs text-gray-400 mt-1">{requestDate} {requestTime && `• ${requestTime}`}</p>
+                        {/* STATUS */}
+                        <td className="py-3.5 px-4 align-middle">
+                          <div>
+                            <StatusBadge status={r.status} />
+                            <p className="text-[11px] text-slate-400 font-medium mt-1">
+                              {requestDate} {requestTime && `• ${requestTime}`}
+                            </p>
+                          </div>
                         </td>
 
-                        {/* Actions Column */}
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-end gap-2">
+                        {/* ACTIONS */}
+                        <td className="py-3.5 pl-4 pr-6 align-middle text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* View Modal */}
                             <button 
+                              type="button"
                               onClick={() => setSelectedRequest(r)}
-                              className="p-2 rounded-lg bg-[#f4fcf7] text-[#059669] hover:bg-[#10B981] hover:text-white transition-colors tooltip-trigger"
-                              title="View Details"
+                              className="p-2 rounded-xl bg-teal-50 hover:bg-teal-600 text-teal-700 hover:text-white border border-teal-200 hover:border-teal-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
+                              title="View Full Details"
                             >
-                              <Eye size={18} />
+                              <Eye size={14} />
                             </button>
+
+                            {/* Quick Approve / Reject for Pending */}
                             {r.status === "pending" && (
                               <>
                                 <button
+                                  type="button"
                                   onClick={() => setConfirmAction({ id: r._id, status: "approved" })}
-                                  className="p-2 rounded-lg bg-[#e6f7ef] text-[#10B981] hover:bg-[#10B981] hover:text-white transition-colors"
-                                  title="Approve"
+                                  className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
+                                  title="Approve Request"
                                 >
-                                  <Check size={18} />
+                                  <Check size={14} />
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => setConfirmAction({ id: r._id, status: "rejected" })}
-                                  className="p-2 rounded-lg bg-[#fef2f2] text-[#ef4444] hover:bg-[#ef4444] hover:text-white transition-colors"
-                                  title="Reject"
+                                  className="p-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
+                                  title="Reject Request"
                                 >
-                                  <X size={18} />
+                                  <X size={14} />
                                 </button>
                               </>
                             )}
                           </div>
                         </td>
+
                       </tr>
                     );
                   })
@@ -389,186 +588,189 @@ export default function SubscriptionRequests() {
               </tbody>
             </table>
           </div>
-          
-          <div className="flex items-center justify-between px-6 py-4 bg-[#f4fcf7] border-t border-[#e6f7ef]">
-            <span className="text-sm text-gray-500 font-medium">Showing {filtered.length} requests</span>
-            <div className="flex gap-1">
-              <button className="p-1.5 rounded-lg hover:bg-[#e6f7ef] text-[#059669] transition"><ChevronLeft size={18}/></button>
-              <button className="p-1.5 rounded-lg hover:bg-[#e6f7ef] text-[#059669] transition"><ChevronRight size={18}/></button>
+
+          {/* Table Footer with Pagination */}
+          <div className="bg-emerald-50/50 px-6 py-3 border-t border-emerald-100/80 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 font-semibold">
+            <span>Showing {paginatedRequests.length} of {filtered.length} total requests</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 mr-2">Page {currentPage} of {totalPages}</span>
+              <button 
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronLeft size={16}/>
+              </button>
+              <button 
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronRight size={16}/>
+              </button>
             </div>
           </div>
         </div>
+
       </main>
 
       {/* Modal for Request Details */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 modal-overlay" onClick={() => setSelectedRequest(null)}></div>
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden modal-content flex flex-col z-10 text-left max-h-[90vh]">
+        <div className="fixed inset-0 md:left-[260px] z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 backdrop-blur-md bg-slate-900/50 transition-opacity" onClick={() => setSelectedRequest(null)}></div>
+          <div className="relative my-auto bg-white rounded-3xl shadow-2xl w-full max-w-[500px] max-h-[92vh] overflow-y-auto flex flex-col p-6 z-10 border border-emerald-200 [scrollbar-width:none]">
             
             {/* Modal Header */}
-            <div className="px-8 py-6 bg-gradient-to-br from-[#10B981] to-[#047857] text-white flex items-center justify-between relative overflow-hidden shrink-0">
-              <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white opacity-10 rounded-full blur-xl"></div>
-              <div>
-                <h3 className="text-2xl font-bold">Request Details</h3>
-                <p className="text-sm text-[#a7f3d0] font-medium mt-1">
-                  {selectedRequest._id && seqIdMap[selectedRequest._id] ? seqIdMap[selectedRequest._id] : 'REQ-NEW'}
-                </p>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl avatar-gradient flex items-center justify-center text-white shadow-md shadow-emerald-500/25">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Request Verification</h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {selectedRequest._id && seqIdMap[selectedRequest._id] ? seqIdMap[selectedRequest._id] : 'REQ-NEW'}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setSelectedRequest(null)} className="p-2 bg-black/10 hover:bg-black/20 rounded-full transition-colors relative z-10 text-white cursor-pointer">
-                <X size={20} />
+              <button onClick={() => setSelectedRequest(null)} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+                <X size={18} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-8 space-y-6 overflow-y-auto">
+            <div className="mt-4 space-y-4">
               
-              {/* User Info & Plan Info */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#10B981] to-[#6ee7b7] flex items-center justify-center text-white text-xl font-bold shadow-md">
-                    {(selectedRequest.name || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-[#064e3b]">{selectedRequest.name}</h4>
-                    <div className="flex flex-col gap-1 mt-1 text-sm text-gray-500">
-                      <span className="flex items-center gap-1.5"><Mail size={14}/> {selectedRequest.email}</span>
-                    </div>
-                  </div>
+              {/* User Overview */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="font-extrabold text-slate-900 text-sm">{selectedRequest.name}</p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><Mail size={12}/> {selectedRequest.email}</p>
                 </div>
-                <div className="text-right">
+                <div>
                   <StatusBadge status={selectedRequest.status} />
                 </div>
               </div>
 
-              <div className="h-px w-full bg-gray-100"></div>
-
-              {/* Transaction Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#f4fcf7] p-4 rounded-2xl border border-[#e6f7ef]">
-                  <p className="text-xs text-gray-500 font-medium mb-1">Selected Plan</p>
-                  <p className="font-bold text-[#064e3b] text-base flex items-center gap-1.5">
-                    {React.createElement(getPlanMeta(selectedRequest.plan).icon, { size: 16, color: getPlanMeta(selectedRequest.plan).color })} 
-                    {selectedRequest.plan}
-                  </p>
+              {/* Transaction Specs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-50/50 border border-emerald-200">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan</span>
+                  <p className="text-xs font-bold text-emerald-900 mt-0.5">{selectedRequest.plan}</p>
                 </div>
-                <div className="bg-[#f4fcf7] p-4 rounded-2xl border border-[#e6f7ef]">
-                  <p className="text-xs text-gray-500 font-medium mb-1">Plan Price</p>
-                  <p className="font-bold text-[#064e3b] text-lg">₹{getPlanMeta(selectedRequest.plan).price}</p>
-                </div>
-
-                {/* UPI ID Section */}
-                <div className="bg-[#f4fcf7] p-4 rounded-2xl border border-[#e6f7ef] col-span-2">
-                  <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1.5">
-                    <CreditCard size={14} className="text-[#059669]"/> UPI ID
-                  </p>
-                  <p className="font-bold text-[#064e3b] text-base font-mono break-all">
-                    {selectedRequest.upiId || 'Not provided'}
-                  </p>
-                </div>
-
-                {/* Payment Screenshot Section */}
-                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 col-span-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
-                      <Image size={14} className="text-[#059669]"/> Payment Screenshot
-                    </p>
-                    {selectedRequest.screenshot && (
-                      <button 
-                        type="button"
-                        onClick={() => setPreviewImage(selectedRequest.screenshot)}
-                        className="text-xs text-[#059669] hover:text-[#047857] font-bold flex items-center gap-1 cursor-pointer hover:underline"
-                      >
-                        <ZoomIn size={13}/> Full View
-                      </button>
-                    )}
-                  </div>
-                  {selectedRequest.screenshot ? (
-                    <div 
-                      onClick={() => setPreviewImage(selectedRequest.screenshot)}
-                      className="cursor-pointer group relative rounded-xl overflow-hidden border border-gray-200 bg-black/5 max-h-60 flex items-center justify-center hover:opacity-95 transition-opacity"
-                    >
-                      <img 
-                        src={selectedRequest.screenshot} 
-                        alt="Payment Receipt Screenshot" 
-                        className="max-h-60 w-full object-contain rounded-lg"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'block';
-                        }}
-                      />
-                      <div className="hidden p-4 text-center text-xs text-gray-400">
-                        ⚠️ Image could not be loaded or is corrupted.
-                      </div>
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
-                        <ZoomIn size={16} /> Click to Enlarge
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 italic py-2">No payment screenshot attached.</p>
-                  )}
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 col-span-2">
-                  <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1"><FileText size={12}/> User Message</p>
-                  <p className="text-sm font-semibold text-gray-700 whitespace-pre-wrap">{selectedRequest.message || 'No message provided.'}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 col-span-2">
-                  <p className="text-xs text-gray-500 font-medium mb-1 flex items-center gap-1"><Calendar size={12}/> Date & Time Received</p>
-                  <p className="font-bold text-gray-700">
-                    {selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </p>
+                <div className="p-3 rounded-2xl bg-emerald-50/50 border border-emerald-200">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Price</span>
+                  <p className="text-sm font-extrabold text-slate-900 mt-0.5">₹{getPlanMeta(selectedRequest.plan).price}</p>
                 </div>
               </div>
 
+              {/* UPI Section */}
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard size={11} className="text-emerald-600"/> UPI Reference / ID
+                </span>
+                <p className="font-mono-code text-xs font-bold text-slate-800 mt-1 break-all">
+                  {selectedRequest.upiId || 'Not provided'}
+                </p>
+              </div>
+
+              {/* Screenshot Proof */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <Image size={11} className="text-emerald-600"/> Payment Screenshot
+                  </span>
+                  {selectedRequest.screenshot && (
+                    <button 
+                      type="button"
+                      onClick={() => setPreviewImage(selectedRequest.screenshot)}
+                      className="text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer hover:underline"
+                    >
+                      <ZoomIn size={12}/> Full Preview
+                    </button>
+                  )}
+                </div>
+                {selectedRequest.screenshot ? (
+                  <div 
+                    onClick={() => setPreviewImage(selectedRequest.screenshot)}
+                    className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-200 bg-black/5 max-h-56 flex items-center justify-center"
+                  >
+                    <img 
+                      src={selectedRequest.screenshot} 
+                      alt="Payment Receipt" 
+                      className="max-h-56 w-full object-contain rounded-lg"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'block';
+                      }}
+                    />
+                    <div className="hidden p-4 text-center text-xs text-slate-400">
+                      ⚠️ Image failed to load.
+                    </div>
+                    <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
+                      <ZoomIn size={15} /> Click to Enlarge
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic py-1">No payment screenshot attached.</p>
+                )}
+              </div>
+
+              {/* Date & Note */}
+              {selectedRequest.message && (
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">User Note</span>
+                  <p className="text-xs font-semibold text-slate-700 mt-1 whitespace-pre-wrap">{selectedRequest.message}</p>
+                </div>
+              )}
             </div>
 
-            {/* Modal Footer Actions */}
+            {/* Modal Actions for Pending Request */}
             {selectedRequest.status === "pending" && (
-              <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex gap-4 shrink-0">
+              <div className="mt-5 flex gap-3 pt-3 border-t border-slate-100">
                 <button 
+                  type="button"
                   onClick={() => setConfirmAction({ id: selectedRequest._id, status: "rejected" })}
-                  className="flex-1 py-3 rounded-xl font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition text-xs cursor-pointer"
                 >
                   Reject Request
                 </button>
                 <button 
+                  type="button"
                   onClick={() => setConfirmAction({ id: selectedRequest._id, status: "approved" })}
-                  className="flex-1 py-3 rounded-xl font-bold text-white bg-[#10B981] hover:bg-[#059669] shadow-lg shadow-[#10B981]/30 transition-all cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-600/30 transition text-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  Approve Request
+                  <Check size={14} /> Approve & Activate
                 </button>
               </div>
             )}
+
           </div>
         </div>
       )}
 
-      {/* Dedicated Large Image Preview Modal */}
+      {/* Large Image Preview Modal */}
       {previewImage && (
         <div 
           onClick={() => setPreviewImage(null)}
-          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in cursor-pointer"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md cursor-pointer"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="relative max-w-3xl w-full max-h-[90vh] bg-[#111827] border border-white/20 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center cursor-default"
+            className="relative max-w-3xl w-full max-h-[90vh] bg-slate-900 border border-slate-700/80 rounded-3xl p-5 shadow-2xl flex flex-col items-center cursor-default"
           >
-            <div className="w-full flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+            <div className="w-full flex items-center justify-between pb-3 border-b border-slate-700/60 mb-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <Image size={16} className="text-[#10B981]" /> Payment Screenshot Preview
+                <Image size={16} className="text-emerald-400" /> Payment Screenshot Proof
               </h4>
               <button 
                 onClick={() => setPreviewImage(null)}
-                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="overflow-auto max-h-[75vh] w-full flex items-center justify-center rounded-2xl bg-black/50 p-2">
+            <div className="overflow-auto max-h-[75vh] w-full flex items-center justify-center rounded-2xl bg-black/40 p-2">
               <img 
                 src={previewImage} 
                 alt="Full Screenshot Proof" 
@@ -588,42 +790,44 @@ export default function SubscriptionRequests() {
 
       {/* Confirmation Modal for Approve / Reject */}
       {confirmAction && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <div className="absolute inset-0 modal-overlay" onClick={() => setConfirmAction(null)}></div>
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 text-center modal-content z-10 border border-[#e6f7ef]">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${
-              confirmAction.status === 'approved' ? 'bg-[#e6f7ef] text-[#10B981]' : 'bg-[#fef2f2] text-[#ef4444]'
+        <div className="fixed inset-0 md:left-[260px] z-[120] flex items-center justify-center p-4">
+          <div className="fixed inset-0 backdrop-blur-md bg-slate-900/50" onClick={() => setConfirmAction(null)}></div>
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center z-10 border border-emerald-200">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3.5 ${
+              confirmAction.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
             }`}>
-              {confirmAction.status === 'approved' ? <Check size={28} /> : <X size={28} />}
+              {confirmAction.status === 'approved' ? <Check size={24} /> : <X size={24} />}
             </div>
-            <h3 className="text-xl font-bold text-[#064e3b] mb-2">
-              {confirmAction.status === 'approved' ? 'Approve Request' : 'Reject Request'}
+            <h3 className="text-base font-extrabold text-slate-900 mb-1">
+              {confirmAction.status === 'approved' ? 'Approve Subscription Request' : 'Reject Subscription Request'}
             </h3>
-            <p className="text-sm font-semibold text-gray-600 mb-6">
+            <p className="text-xs text-slate-500 mb-5 font-medium leading-relaxed">
               {confirmAction.status === 'approved' 
-                ? "Are you sure you want to approve this request?" 
-                : "Are you sure you want to reject this request?"}
+                ? "This will activate the user's subscription and award full member benefits immediately." 
+                : "This request will be marked as rejected."}
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-2.5">
               <button 
+                type="button"
                 onClick={() => setConfirmAction(null)}
-                className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors text-sm cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button 
+                type="button"
                 onClick={async () => {
                   const { id, status } = confirmAction;
                   setConfirmAction(null);
                   await updateStatus(id, status);
                 }}
-                className={`flex-1 py-3 rounded-xl font-bold text-white transition-all text-sm shadow-md cursor-pointer ${
+                className={`flex-1 py-2.5 rounded-xl font-bold text-white transition text-xs shadow-md cursor-pointer ${
                   confirmAction.status === 'approved' 
-                    ? 'bg-[#10B981] hover:bg-[#059669] shadow-[#10B981]/30' 
-                    : 'bg-[#ef4444] hover:bg-[#dc2626] shadow-red-500/30'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/30' 
+                    : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
                 }`}
               >
-                {confirmAction.status === 'approved' ? 'Approve' : 'Reject'}
+                {confirmAction.status === 'approved' ? 'Confirm Approval' : 'Confirm Rejection'}
               </button>
             </div>
           </div>
@@ -636,14 +840,14 @@ export default function SubscriptionRequests() {
 
 function StatusBadge({ status }) {
   const map = {
-    pending: { label: "Pending", bg: "#fef3c7", color: "#d97706", dot: "#f59e0b" },
-    approved: { label: "Approved", bg: "#e6f7ef", color: "#10B981", dot: "#10B981" },
-    rejected: { label: "Rejected", bg: "#fee2e2", color: "#ef4444", dot: "#ef4444" },
+    pending: { label: "Pending", bg: "#fef3c7", color: "#b45309", dot: "#f59e0b" },
+    approved: { label: "Approved", bg: "#ecfdf5", color: "#065f46", dot: "#10b981" },
+    rejected: { label: "Rejected", bg: "#fff1f2", color: "#9f1239", dot: "#f43f5e" },
   };
   const s = map[status] || map.pending;
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider" style={{ background: s.bg, color: s.color }}>
-      <span className="w-2 h-2 rounded-full shadow-sm" style={{ background: s.dot }} />
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider" style={{ background: s.bg, color: s.color }}>
+      <span className="w-1.5 h-1.5 rounded-full shadow-xs" style={{ background: s.dot }} />
       {s.label}
     </span>
   );

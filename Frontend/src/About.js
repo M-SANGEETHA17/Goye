@@ -33,7 +33,7 @@ export default function About() {
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [hoveredPlan, setHoveredPlan] = useState(null);
     const activePlan = hoveredPlan !== null ? hoveredPlan : selectedPlan;
-    const [activeCategory, setActiveCategory] = useState('daily');
+    const [activeCategory, setActiveCategory] = useState('all');
 
     const [modalPlan, setModalPlan] = useState(null);
     const [activeModalTab, setActiveModalTab] = useState('options');
@@ -261,7 +261,7 @@ export default function About() {
             const planName = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].name) || "One Day";
             const planPrice = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].price) || "₹49";
 
-            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
+            const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
             const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1251,12 +1251,6 @@ export default function About() {
 
                             {activeModalTab === 'contact' && (
                                 <div className="p-8 text-center">
-                                    <button 
-                                        onClick={() => setActiveModalTab('options')} 
-                                        className={`text-xs font-bold text-white/50 ${planDetails[modalPlan].hoverText} mb-6 flex items-center gap-1.5 transition-colors absolute top-4 left-6`}
-                                    >
-                                        ← Back
-                                    </button>
                                     <div className="mt-4">
                                         <div className={`w-16 h-16 ${planDetails[modalPlan].iconBg} rounded-full flex items-center justify-center text-3xl mx-auto mb-4`}>
                                             📞
@@ -1288,13 +1282,6 @@ export default function About() {
 
                             {activeModalTab === 'request' && (
                                 <div className="p-6 sm:p-10 relative">
-                                    <button 
-                                        onClick={() => setActiveModalTab('options')} 
-                                        className={`text-sm font-bold text-white/50 hover:text-white mb-6 flex items-center gap-2 transition-colors absolute top-6 left-6`}
-                                    >
-                                        ← Back
-                                    </button>
-                                    
                                     <div className="text-center mb-8 mt-6">
                                         <div className="w-16 h-16 mx-auto bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center text-2xl mb-5 shadow-[0_0_20px_rgba(59,130,246,0.2)] border border-blue-500/20">
                                             <FaCheckCircle className="text-2xl" />
@@ -1307,7 +1294,7 @@ export default function About() {
                                         onSubmit={async (e) => {
                                             e.preventDefault();
                                             try {
-                                                const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
+                                                const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
                                                 const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
@@ -1396,12 +1383,6 @@ export default function About() {
 
                             {activeModalTab === 'payment' && (
                                 <div className="p-8 text-center">
-                                    <button 
-                                        onClick={() => setActiveModalTab('options')} 
-                                        className={`text-xs font-bold text-white/50 ${planDetails[modalPlan].hoverText} mb-6 flex items-center gap-1.5 transition-colors absolute top-4 left-6`}
-                                    >
-                                        ← Back
-                                    </button>
                                     <div className="mt-4 flex flex-col items-center">
                                         <div className="flex items-center gap-2 mb-1 justify-center">
                                             <span className="text-[#34E38A] text-lg font-extrabold">QR</span>

@@ -12,7 +12,7 @@ export default function Subscriptions() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const [activeCategory, setActiveCategory] = useState('daily');
+    const [activeCategory, setActiveCategory] = useState('all');
     const isFreeUserLoggedIn = !!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData");
 
     const [modalPlan, setModalPlan] = useState(null);
@@ -250,7 +250,7 @@ export default function Subscriptions() {
             const planName = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].name) || "One Day";
             const planPrice = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].price) || "₹49";
 
-            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
+            const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
             const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -772,6 +772,8 @@ export default function Subscriptions() {
                                 onClick={() => {
                                     if (!plan.isDemo) {
                                         setModalPlan(plan.key);
+                                    } else if (!isPlanActive) {
+                                        navigate('/free-user/login');
                                     }
                                 }}
                                 className={`rounded-[24px] p-8 sm:p-9 flex flex-col justify-between relative cursor-pointer group transition-all duration-300 ease-out bg-[#030e06] ${borderAndShadow}`}
@@ -816,7 +818,7 @@ export default function Subscriptions() {
                                              <li key={idx} className="flex items-start gap-2.5 text-sm text-white/90 leading-relaxed font-medium">
                                                 <span className={`${checkColor} font-bold text-sm shrink-0 mt-0.5 drop-shadow-md`}>✓</span>
                                                 <span className="tracking-wide">{feat}</span>
-                                            </li>
+                                             </li>
                                         ))}
                                     </ul>
                                 </div>
@@ -832,9 +834,11 @@ export default function Subscriptions() {
                                     </button>
                                 ) : plan.isDemo ? (
                                     <button 
-                                        disabled={true}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-full py-3.5 rounded-xl font-bold text-sm bg-white/5 border border-white/10 text-white/40 cursor-not-allowed flex items-center justify-center gap-2 select-none opacity-60"
+                                        onClick={(e) => { 
+                                            e.stopPropagation(); 
+                                            navigate('/free-user/login'); 
+                                        }}
+                                        className="w-full py-3.5 rounded-xl font-bold text-sm bg-[#06190e] hover:bg-[#25D366] text-white hover:text-black border border-[#25D366]/40 hover:border-[#25D366] hover:shadow-[0_0_25px_rgba(37,211,102,0.5)] transition-all duration-300 cursor-pointer shadow-md flex items-center justify-center"
                                     >
                                         Choose Plan
                                     </button>
@@ -1038,7 +1042,7 @@ export default function Subscriptions() {
                                     onSubmit={async (e) => {
                                         e.preventDefault();
                                         try {
-                                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye.onrender.com';
+                                            const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
                                             const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },

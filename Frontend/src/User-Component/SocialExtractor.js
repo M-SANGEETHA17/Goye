@@ -17,7 +17,8 @@ import {
   FaCheck,
   FaPause,
   FaPlay,
-  FaStop
+  FaStop,
+  FaTrashAlt
 } from "react-icons/fa";
 import { FiLayers, FiRefreshCw, FiCopy } from "react-icons/fi";
 import * as XLSX from "xlsx";
@@ -33,22 +34,56 @@ export default function SocialExtractor() {
   });
 
   // Search states
-  const [niche, setNiche] = useState("");
-  const [location, setLocation] = useState("");
+  const [niche, setNiche] = useState(() => {
+    try {
+      return sessionStorage.getItem("goye_social_niche") || "";
+    } catch (e) {
+      return "";
+    }
+  });
+  const [location, setLocation] = useState(() => {
+    try {
+      return sessionStorage.getItem("goye_social_location") || "";
+    } catch (e) {
+      return "";
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [leads, setLeads] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [leads, setLeads] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("goye_social_leads");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [selectedIds, setSelectedIds] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("goye_social_selected");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [showClearModal, setShowClearModal] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3500);
   };
 
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("goye_social_leads");
+      return saved ? JSON.parse(saved).length > 0 : false;
+    } catch (e) {
+      return false;
+    }
+  });
 
   // ── Refs for real-time Socket.IO progressive streaming ──────────────────
   const socketRef = useRef(null);
@@ -66,7 +101,7 @@ export default function SocialExtractor() {
 
   // Connect Socket.IO once on mount
   useEffect(() => {
-    const apiBase = process.env.REACT_APP_API_URL || "https://goye.onrender.com";
+    const apiBase = process.env.REACT_APP_API_URL || "http://localhost:5000";
     const socketUrl = window.location.hostname === "localhost" ? "http://localhost:5000" : apiBase;
 
     const socket = io(socketUrl, {
@@ -187,6 +222,47 @@ export default function SocialExtractor() {
     };
   }, []);
 
+  // Persist leads to sessionStorage
+  useEffect(() => {
+    try {
+      if (leads.length > 0) {
+        sessionStorage.setItem("goye_social_leads", JSON.stringify(leads));
+      }
+    } catch (e) {
+      console.warn("Could not save social leads to sessionStorage", e);
+    }
+  }, [leads]);
+
+  useEffect(() => {
+    try {
+      if (selectedIds.length > 0) {
+        sessionStorage.setItem("goye_social_selected", JSON.stringify(selectedIds));
+      }
+    } catch (e) {}
+  }, [selectedIds]);
+
+  useEffect(() => {
+    try {
+      if (niche) sessionStorage.setItem("goye_social_niche", niche);
+      if (location) sessionStorage.setItem("goye_social_location", location);
+    } catch (e) {}
+  }, [niche, location]);
+
+  const handleConfirmClear = () => {
+    setLeads([]);
+    setSelectedIds([]);
+    setHasSearched(false);
+    setIsLoading(false);
+    setIsPaused(false);
+    setShowClearModal(false);
+    leadIndexRef.current = 0;
+    try {
+      sessionStorage.removeItem("goye_social_leads");
+      sessionStorage.removeItem("goye_social_selected");
+    } catch (e) {}
+    showToast("All extracted social leads cleared successfully!");
+  };
+
   const handlePause = () => {
     setIsPaused(true);
     if (socketRef.current) {
@@ -241,6 +317,10 @@ export default function SocialExtractor() {
     setLeads([]);
     setSelectedIds([]);
     leadIndexRef.current = 0;
+    try {
+      sessionStorage.removeItem("goye_social_leads");
+      sessionStorage.removeItem("goye_social_selected");
+    } catch (e) {}
 
     // Use fast real-time Socket.IO progressive streaming
     if (socketRef.current) {
@@ -251,7 +331,7 @@ export default function SocialExtractor() {
     } else {
       // Fallback to REST API if socket not available
       try {
-        const apiBase = process.env.REACT_APP_API_URL || "https://goye.onrender.com";
+        const apiBase = process.env.REACT_APP_API_URL || "http://localhost:5000";
         const localUrl = window.location.hostname === "localhost" ? "http://localhost:5000" : apiBase;
         const scrapeRes = await fetch(`${localUrl}/api/scrape-leads`, {
           method: "POST",
@@ -429,6 +509,45 @@ export default function SocialExtractor() {
             : "bg-[#062417]/95 border-[#25D366]/50 text-emerald-300"
         }`}>
           {toast.type === "error" ? "⚠️" : "✅"} {toast.message}
+        </div>
+      )}
+
+      {/* Confirmation Modal for Clear Data */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-[100020] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#111B21] border border-white/10 rounded-2xl sm:rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.8)] relative text-center">
+            {/* Warning Trash Icon Circle */}
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(244,63,94,0.15)]">
+              <FaTrashAlt size={24} />
+            </div>
+
+            <h3 className="text-xl font-extrabold text-white mb-2">
+              Clear Extracted Leads?
+            </h3>
+            
+            <p className="text-white/60 text-sm leading-relaxed mb-6">
+              Are you sure you want to clear all <strong className="text-white">{leads.length}</strong> extracted profiles? This action will remove current leads and cannot be undone.
+            </p>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowClearModal(false)}
+                className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-bold text-sm transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleConfirmClear}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-extrabold text-sm shadow-[0_0_20px_rgba(244,63,94,0.35)] transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <FaTrashAlt size={14} />
+                <span>Yes, Clear All</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -699,6 +818,18 @@ export default function SocialExtractor() {
               >
                 <FaDownload className="text-[#25D366]" />
                 <span>Export CSV</span>
+              </button>
+
+              {/* Clear Data Button */}
+              <button
+                type="button"
+                onClick={() => setShowClearModal(true)}
+                disabled={leads.length === 0 || isLoading}
+                className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/30 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-95 shrink-0"
+                title="Clear all extracted leads"
+              >
+                <FaTrashAlt className="text-rose-400 text-xs" />
+                <span>Clear Data</span>
               </button>
             </div>
           </div>

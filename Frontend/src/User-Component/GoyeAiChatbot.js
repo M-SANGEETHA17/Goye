@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiX, FiSend, FiPaperclip, FiBot, FiUser, FiMessageSquare } from 'react-icons/fi';
-import { FaRobot, FaWhatsapp, FaUsers, FaCoins, FaClock, FaTags, FaBolt, FaSearch } from 'react-icons/fa';
+import { FaRobot, FaWhatsapp, FaUsers, FaCoins, FaClock, FaTags, FaBolt, FaSearch, FaShieldAlt, FaQuestionCircle } from 'react-icons/fa';
 
 export default function GoyeAiChatbot({ isOpen, onClose }) {
   const [messages, setMessages] = useState([]);
@@ -24,58 +24,88 @@ export default function GoyeAiChatbot({ isOpen, onClose }) {
     }
   }, [messages, isTyping, isOpen]);
 
-  // Suggestion Cards Data
+  // Comprehensive Suggestions: Covering Pre-login fundamental doubts + In-app features
   const suggestions = [
+    { label: 'Two Logins Guide', icon: <FaUsers className="text-[#25D366]" />, prompt: 'Why are there two logins? Which login should I choose (Normal vs Free User)?' },
+    { label: 'Subscription Plans', icon: <FaTags className="text-[#25D366]" />, prompt: 'What are the subscription plans, pricing, and credits?' },
+    { label: 'Free User Access', icon: <FaCoins className="text-[#25D366]" />, prompt: 'What is Free User Login and what features can I test?' },
+    { label: 'Platform Features', icon: <FaBolt className="text-[#25D366]" />, prompt: 'What features are available in Goye (Bulk Sender, Scraper, Extractor)?' },
     { label: 'Connect WhatsApp', icon: <FaWhatsapp className="text-[#25D366]" />, prompt: 'How do I connect my WhatsApp account to Goye?' },
     { label: 'Social Leads', icon: <FaSearch className="text-[#25D366]" />, prompt: 'How does Social Leads extraction work?' },
     { label: 'Bulk Messaging', icon: <FaBolt className="text-[#25D366]" />, prompt: 'How does bulk messaging work and how to upload contacts?' },
-    { label: 'Team Campaign', icon: <FaUsers className="text-[#25D366]" />, prompt: 'What is a Team Campaign and how to split work?' },
-    { label: 'Credits System', icon: <FaCoins className="text-[#25D366]" />, prompt: 'How do daily free credits work in Goye?' },
-    { label: 'Scheduled Messages', icon: <FaClock className="text-[#25D366]" />, prompt: 'Will scheduled messages work if my PC is powered off?' },
-    { label: 'Plans & Pricing', icon: <FaTags className="text-[#25D366]" />, prompt: 'What are the plans, limits, and pricing details?' }
+    { label: 'Credits System', icon: <FaCoins className="text-[#25D366]" />, prompt: 'How do daily free credits work in Goye?' }
   ];
 
-  // Mock AI Engine (Easily replaceable with an API call in the future)
+  // AI Knowledge Engine
   const getAiResponse = async (userPrompt) => {
     const p = userPrompt.toLowerCase();
 
+    // 1. Two Logins Clarification
+    if (p.includes('two login') || p.includes('2 login') || p.includes('which login') || (p.includes('login') && (p.includes('normal') || p.includes('free') || p.includes('diff') || p.includes('choose') || p.includes('both')))) {
+      return "🔑 **Goye has Two Types of Logins:**\n\n1. 🌟 **Subscribed Member Login (/userlogin)**:\n• For registered members with a paid subscription (One Day, 1 Week, 1 Month, etc.).\n• Unlocks **99,999 marketing credits**, high-speed broadcasting, and all premium extractors.\n\n2. 🆓 **Free User Login (/free-user/login)**:\n• For new visitors who want to test Goye before purchasing a plan!\n• Simple registration without upfront payment to explore features.\n\n👉 **Which should you use?** If you have already subscribed to a plan, use **Member Login**. If you are a new guest testing the platform, use **Free User Login**!";
+    }
+
+    // 2. Free User Details
+    if (p.includes('free user') || (p.includes('free') && (p.includes('account') || p.includes('trial') || p.includes('register') || p.includes('login') || p.includes('benefit')))) {
+      return "🆓 **Free User Account & Trial Details**:\n\n• **Instant Trial**: Quick registration with your Name, Phone & Business details.\n• **Explore Features**: Test WhatsApp QR connection, explore scrapers, and preview messaging workflows.\n• **Upgrade Anytime**: You can request or be upgraded by Admin to a full Subscribed plan with 99,999 credits anytime!\n\n👉 To get started, click **Free User Login** or head to **/free-user/register**.";
+    }
+
+    // 3. Subscription Plans & Pricing
+    if (p.includes('subscription') || p.includes('plan') || p.includes('pricing') || p.includes('price') || p.includes('cost') || p.includes('rate') || p.includes('buy') || p.includes('upgrade')) {
+      return "💎 **Goye All-Inclusive Subscription Plans**:\n\n• ⚡ **One Day (24 Hours)**: ₹49 (Quick one-time event/campaign blast)\n• 📅 **One Week (7 Days)**: ₹249 (Weekly sales promotion)\n• 🌟 **15 Days Plan**: ₹499 (Semi-monthly campaign)\n• 💎 **One Month (30 Days)**: ₹799 *(Most Popular - Full 99,999 Credits)*\n• 🚀 **3 Months**: ₹1,999 | **6 Months**: ₹3,499 | **1 Year**: ₹5,999\n\n✨ **Every Subscription Includes**:\n✅ 99,999 Broadcast Marketing Credits\n✅ B2B Social Leads & Google Maps Scraper\n✅ Anti-Ban Safe Delay Dispatcher\n✅ Multi-media attach (Images, Docs, Audio Notes, Video)";
+    }
+
+    // 4. Platform Overview / Features
+    if (p.includes('feature') || p.includes('what is goye') || p.includes('what can') || p.includes('services') || p.includes('overview') || p.includes('platform')) {
+      return "⚡ **Top Features of Goye Platform**:\n\n1. 📲 **WhatsApp Bulk Sender**: Broadcast to thousands of numbers with custom variables, images, videos & voice notes.\n2. 🔍 **Social Media Lead Extractor**: Mine public business numbers from Facebook, Instagram, LinkedIn, YouTube & TikTok.\n3. 🌐 **Google Maps & Web Scraper**: Extract local business leads by keyword and target city.\n4. 👥 **WhatsApp Group Extractor**: Extract members directly from any joined WhatsApp group into Excel.\n5. ⏱️ **Scheduled Broadcasting**: Set campaigns to send automatically at future dates/times.";
+    }
+
+    // 5. Connect WhatsApp
     if (p.includes('connect') || p.includes('qr') || p.includes('whatsapp') || p.includes('link')) {
-      return "To connect your WhatsApp:\n1. Click **Connect Device Now** or the top **Connect** button.\n2. Open WhatsApp on your phone → **Linked Devices** → **Link a Device**.\n3. Scan the QR code displayed on screen. Once authenticated, your session is encrypted & ready for bulk broadcasts!";
+      return "📲 **Connecting Your WhatsApp to Goye**:\n\n1. Click **Connect Device Now** on the top navigation bar.\n2. Open WhatsApp on your phone → Settings / Menu → **Linked Devices** → **Link a Device**.\n3. Point your camera and scan the QR code displayed on screen.\n4. Once linked, your WhatsApp is encrypted & ready to broadcast directly from your browser!";
     }
 
+    // 6. Social Leads / Scraper
     if (p.includes('social') || p.includes('soical') || p.includes('lead') || p.includes('extract') || p.includes('scrape') || p.includes('scraper') || p.includes('b2b')) {
-      return "Goye Social Leads Extractor & Web Scraper:\n1. **Select Platform**: Choose Facebook, Instagram, LinkedIn, YouTube, TikTok, or Google Maps.\n2. **Target Keywords**: Enter your search keyword (e.g. 'Gym Owners', 'Real Estate') and target location/country.\n3. **Extract Real-Time**: Click **Search / Extract Leads** to find public phone numbers & business leads.\n4. **Instant Action**: Export numbers as Excel/CSV or transfer them directly into the Bulk Messaging panel to start broadcasting immediately!";
+      return "🔍 **Goye Social Leads Extractor & Web Scraper**:\n\n1. **Select Platform**: Choose Facebook, Instagram, LinkedIn, YouTube, TikTok, or Google Maps.\n2. **Target Keywords**: Enter your search keyword (e.g. 'Boutiques', 'Real Estate', 'Restaurants') and target location.\n3. **Extract Real-Time**: Click **Search / Extract Leads** to find public verified phone numbers.\n4. **Instant Action**: Export leads to Excel/CSV or transfer directly to the Bulk Sender!";
     }
 
+    // 7. Bulk Messaging & File Uploads
     if (p.includes('bulk') || p.includes('csv') || p.includes('excel') || p.includes('upload') || p.includes('contact')) {
-      return "For Bulk Messaging in Goye:\n1. Upload your CSV or Excel file containing contact numbers, or enter numbers manually separated by commas.\n2. Add your text message, record voice, or attach media (up to 3 Images, 2 Docs, 1 Video).\n3. Click **Send Messages**! Goye automatically maintains a 2-second anti-spam delay between sends.";
+      return "🚀 **Bulk Messaging in Goye**:\n\n1. Upload your CSV or Excel file containing contact numbers, or paste numbers separated by commas.\n2. Type your text message, record voice, or attach media (up to 3 Images, 2 Docs, 1 Video).\n3. Click **Send Messages**! Goye automatically maintains an anti-ban delay between sends.";
     }
 
+    // 8. Team Campaign
     if (p.includes('team') || p.includes('split') || p.includes('lobby') || p.includes('join')) {
-      return "Team Campaign allows you to split large contact lists among team members:\n1. Click **Split with Team** on the Messages panel.\n2. Set batch size per member & generate a join link.\n3. Share the link with teammates so everyone sends a fraction of the list, preventing single-number rate limits!";
+      return "👥 **Team Campaign Feature**:\n\nAllows you to split large contact lists among team members:\n1. Click **Split with Team** on the Messages panel.\n2. Set batch size per member & generate a join link.\n3. Share the link with teammates so everyone sends a fraction of the list, preventing single-number rate limits!";
     }
 
-    if (p.includes('credit') || p.includes('free') || p.includes('limit') || p.includes('cost')) {
-      return "Goye Credits Information:\n• 1 Credit = 2 Bulk Messages sent.\n• Free tier accounts receive 30 daily credits automatically.\n• You can check your remaining credits directly in your Profile top bar!";
+    // 9. Credits System
+    if (p.includes('credit') || p.includes('balance') || p.includes('limit')) {
+      return "🪙 **Goye Credits Information**:\n\n• 1 Credit = 2 Bulk Messages sent.\n• Subscribed plans receive **99,999 credits** for unlimited campaigning.\n• Free accounts receive daily test credits.\n• You can check your remaining balance in your Profile top bar anytime!";
     }
 
+    // 10. Scheduled Messages
     if (p.includes('schedule') || p.includes('time') || p.includes('off') || p.includes('sleep') || p.includes('later')) {
-      return "Scheduled Messages in Goye:\n• Schedules are safely stored in **MongoDB Database**.\n• If your PC is ON, the message fires at the exact minute set.\n• If your PC is OFF/sleeping, Goye reloads pending jobs from MongoDB as soon as you turn your PC ON and sends them immediately!\n• For 24/7 exact-time execution while PC is off, deploy Goye to a cloud server like Render.";
+      return "⏰ **Scheduled Messages in Goye**:\n\n• Schedules are safely stored in **MongoDB Database**.\n• If your PC is ON, the message fires at the exact minute set.\n• If your PC is OFF/sleeping, Goye reloads pending jobs from MongoDB as soon as you turn your PC ON and sends them immediately!\n• For 24/7 exact-time execution while PC is off, deploy Goye to a cloud server like Render.";
     }
 
-    if (p.includes('plan') || p.includes('price') || p.includes('pricing') || p.includes('pro') || p.includes('cost')) {
-      return "Goye Pricing & Capabilities:\n• **Free Starter Plan**: 30 Daily Credits, Multi-file Uploads, Voice-to-Text, and Scheduled Messages.\n• **Enterprise / Custom Plan**: Unlimited Credits, Multi-Account Switching, Cloud 24/7 Scheduling & Dedicated API Support.\nFeel free to contact admin: +91 99430 42369 for enterprise inquiries!";
-    }
-
+    // 11. Voice Features
     if (p.includes('voice') || p.includes('mic') || p.includes('speech') || p.includes('audio') || p.includes('ptt')) {
-      return "Goye Voice Features:\n1. **Voice-to-Text**: Click the green 'Voice to Text' button next to the text box and speak into your mic to auto-type.\n2. **Blue Mic Voice Note (PTT)**: Upload any audio file (.mp3/.ogg) and Goye sends it as a genuine WhatsApp Push-To-Talk Voice Note!";
+      return "🎙️ **Goye Voice Features**:\n\n1. **Voice-to-Text**: Click the green 'Voice to Text' button next to the text box and speak into your mic to auto-type.\n2. **Blue Mic Voice Note (PTT)**: Upload any audio file (.mp3/.ogg) and Goye sends it as a genuine WhatsApp Push-To-Talk Voice Note!";
     }
 
-    if (p.includes('hi') || p.includes('hello') || p.includes('hey') || p.includes('greetings')) {
-      return "Hello! 👋 I'm Goye AI. How can I assist your WhatsApp broadcasting today?";
+    // 12. Support & Help
+    if (p.includes('support') || p.includes('help') || p.includes('contact') || p.includes('call') || p.includes('admin') || p.includes('human') || p.includes('phone')) {
+      return "📞 **Goye Support & Assistance**:\n\n• **Admin Phone/WhatsApp**: +91 99430 42369\n• **Email**: support@goye.in\n• **Live Demo & Plan Activation**: Contact us anytime to get an instant demonstration or upgrade!";
     }
 
-    return "Thank you for reaching out! I'm Goye AI Assistant. I can help with connecting WhatsApp, bulk sending, multi-file limits, scheduling, and credits. If you need dedicated human support, feel free to contact admin: +91 99430 42369!";
+    // 13. Greetings
+    if (p.includes('hi') || p.includes('hello') || p.includes('hey') || p.includes('greetings') || p.includes('vanakkam')) {
+      return "Hello! 👋 Welcome to Goye WhatsApp Growth Platform. I'm Goye AI Assistant! How can I help you today? Feel free to ask about our 2 logins, subscription plans, free user trials, or features!";
+    }
+
+    return "Thank you for reaching out! I'm Goye AI Assistant. I can help with choosing between our 2 logins, subscription plans, free user trials, WhatsApp connection, bulk broadcasting, and scrapers. If you need human assistance, feel free to reach admin at +91 99430 42369!";
   };
 
   const handleSend = async (customPrompt) => {
@@ -94,7 +124,7 @@ export default function GoyeAiChatbot({ isOpen, onClose }) {
       const botMessage = { id: Date.now() + 1, sender: 'bot', text: botReplyText };
       setMessages((prev) => [...prev, botMessage]);
       setIsTyping(false);
-    }, 700);
+    }, 600);
   };
 
   const handleKeyDown = (e) => {
@@ -110,7 +140,7 @@ export default function GoyeAiChatbot({ isOpen, onClose }) {
     <div
       className="fixed bottom-28 sm:bottom-[138px] right-3 sm:right-6 left-3 sm:left-auto z-[150] w-[calc(100vw-1.5rem)] sm:w-[400px] max-w-[calc(100vw-1.5rem)] sm:max-w-[400px] bg-[#0D1117] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-fade-in-up text-white"
       style={{
-        height: "min(460px, calc(100vh - 225px))",
+        height: "min(490px, calc(100vh - 225px))",
         maxHeight: "calc(100vh - 225px)",
         fontFamily: "'Inter', sans-serif"
       }}
@@ -146,7 +176,10 @@ export default function GoyeAiChatbot({ isOpen, onClose }) {
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-xs sm:text-sm font-bold text-white leading-tight truncate">AI Assistant</h3>
-            <p className="text-[10px] sm:text-[11px] text-[#9AA4AF] font-medium truncate">Powered by Goye AI</p>
+            <p className="text-[10px] sm:text-[11px] text-[#25D366] font-medium truncate flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse"></span>
+              Always Online • Ready to Help
+            </p>
           </div>
         </div>
 
@@ -181,8 +214,8 @@ export default function GoyeAiChatbot({ isOpen, onClose }) {
               <FaRobot style={{ display: 'none' }} className="text-3xl sm:text-4xl text-[#25D366]" />
             </div>
             <h2 className="text-sm sm:text-base font-extrabold text-white mb-0.5 sm:mb-1">Hi, I'm Goye AI 👋</h2>
-            <p className="text-[11px] sm:text-xs text-[#9AA4AF] max-w-[280px] mb-2.5 sm:mb-4 leading-relaxed">
-              I can help you with everything related to Goye WhatsApp Bulk Messaging.
+            <p className="text-[11px] sm:text-xs text-[#9AA4AF] max-w-[290px] mb-2.5 sm:mb-3.5 leading-relaxed">
+              Ask me about our logins, subscription plans, free trials, or WhatsApp broadcast features.
             </p>
 
             {/* Suggestion Cards */}
@@ -192,15 +225,15 @@ export default function GoyeAiChatbot({ isOpen, onClose }) {
                   key={idx}
                   onClick={() => handleSend(item.prompt)}
                   type="button"
-                  className="bg-[#1C2128] border border-white/[0.08] hover:border-[#25D366]/40 hover:bg-[#161B22] p-2 sm:p-3 rounded-xl transition-all duration-200 group flex flex-col gap-0.5 sm:gap-1 hover:-translate-y-0.5 cursor-pointer min-w-0"
+                  className="bg-[#1C2128] border border-white/[0.08] hover:border-[#25D366]/40 hover:bg-[#161B22] p-2 sm:p-2.5 rounded-xl transition-all duration-200 group flex flex-col gap-0.5 hover:-translate-y-0.5 cursor-pointer min-w-0"
                 >
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <span className="shrink-0 text-xs sm:text-sm">{item.icon}</span>
                     <span className="text-[11px] sm:text-xs font-semibold text-white group-hover:text-[#25D366] transition-colors truncate">
                       {item.label}
                     </span>
                   </div>
-                  <span className="text-[9px] sm:text-[10px] text-[#9AA4AF] truncate">Click to ask</span>
+                  <span className="text-[9px] text-[#9AA4AF] truncate">Tap to ask</span>
                 </button>
               ))}
             </div>
