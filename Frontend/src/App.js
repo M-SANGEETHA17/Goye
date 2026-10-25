@@ -127,7 +127,7 @@ function CreditLimitGuard({ children }) {
     }
     if (!storedEmail) return;
 
-    const apiBase = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
 
     const syncLiveStatus = () => {
       // 1. Check if user's subscription was approved live (and still valid!)
@@ -459,7 +459,7 @@ function CreditLimitGuard({ children }) {
       const planName = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].name) || "One Day";
       const planPrice = (modalPlan && planDetails[modalPlan] && planDetails[modalPlan].price) || "₹49";
 
-      const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye-backend-bw8t.onrender.com';
       const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1931,7 +1931,7 @@ function CreditLimitGuard({ children }) {
                           onSubmit={async (e) => {
                             e.preventDefault();
                             try {
-                              const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+                              const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye-backend-bw8t.onrender.com';
                               const response = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },

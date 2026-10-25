@@ -246,7 +246,7 @@ export default function Navbar() {
     };
 
     try {
-      const response = await fetch("http://localhost:5000/api/support", {
+      const response = await fetch("https://goye-backend-bw8t.onrender.com/api/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

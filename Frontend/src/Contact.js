@@ -37,7 +37,7 @@ export default function Contact() {
         setMessage('');
 
         try {
-            const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+            const apiBaseUrl = process.env.REACT_APP_API_URL || 'https://goye-backend-bw8t.onrender.com';
             const response = await fetch(`${apiBaseUrl}/api/contact/whatsapp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

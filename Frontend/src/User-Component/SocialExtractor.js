@@ -101,8 +101,8 @@ export default function SocialExtractor() {
 
   // Connect Socket.IO once on mount
   useEffect(() => {
-    const apiBase = process.env.REACT_APP_API_URL || "http://localhost:5000";
-    const socketUrl = window.location.hostname === "localhost" ? "http://localhost:5000" : apiBase;
+    const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
+    const socketUrl = window.location.hostname === "localhost" ? "https://goye-backend-bw8t.onrender.com" : apiBase;
 
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"],
@@ -331,8 +331,8 @@ export default function SocialExtractor() {
     } else {
       // Fallback to REST API if socket not available
       try {
-        const apiBase = process.env.REACT_APP_API_URL || "http://localhost:5000";
-        const localUrl = window.location.hostname === "localhost" ? "http://localhost:5000" : apiBase;
+        const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
+        const localUrl = window.location.hostname === "localhost" ? "https://goye-backend-bw8t.onrender.com" : apiBase;
         const scrapeRes = await fetch(`${localUrl}/api/scrape-leads`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

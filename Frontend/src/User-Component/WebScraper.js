@@ -59,8 +59,8 @@ export default function WebScraper() {
 
   useEffect(() => {
     const socketUrl = window.location.hostname === "localhost"
-      ? "http://localhost:5000"
-      : (process.env.REACT_APP_API_URL || "http://localhost:5000");
+      ? "https://goye-backend-bw8t.onrender.com"
+      : (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com");
 
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"],

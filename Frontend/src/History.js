@@ -18,7 +18,7 @@ const C = {
 };
 
 // Backend base URL — keep in sync with the rest of the app
-const API_BASE = API_BASE_URL || "http://localhost:5000";
+const API_BASE = API_BASE_URL || "https://goye-backend-bw8t.onrender.com";
 
 function formatDate(iso) {
   if (!iso) return "—";

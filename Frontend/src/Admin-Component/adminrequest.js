@@ -6,7 +6,7 @@ import {
   RefreshCw, CheckCircle2, XCircle, AlertCircle, Sparkles, ExternalLink, Copy
 } from "lucide-react";
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/+$/, "");
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://goye-backend-bw8t.onrender.com').replace(/\/+$/, "");
 
 const getPlanMeta = (planName = '') => {
   const lower = (planName || '').toLowerCase();

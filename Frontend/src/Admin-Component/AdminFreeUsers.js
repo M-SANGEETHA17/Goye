@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+const API_BASE_URL = (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com").replace(/\/+$/, "");
 
 export default function AdminFreeUsers() {
   const [freeUsers, setFreeUsers] = useState([]);
