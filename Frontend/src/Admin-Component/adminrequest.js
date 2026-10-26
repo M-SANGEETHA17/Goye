@@ -6,7 +6,11 @@ import {
   RefreshCw, CheckCircle2, XCircle, AlertCircle, Sparkles, ExternalLink, Copy
 } from "lucide-react";
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://goye-backend-bw8t.onrender.com').replace(/\/+$/, "");
+const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_BASE_URL = (
+  process.env.REACT_APP_API_URL ||
+  (isLocalHost ? 'http://localhost:5000' : 'https://goye-backend-bw8t.onrender.com')
+).replace(/\/+$/, "");
 
 const getPlanMeta = (planName = '') => {
   const lower = (planName || '').toLowerCase();
@@ -69,9 +73,10 @@ export default function SubscriptionRequests() {
     try {
       let res = await fetch(`${API_BASE_URL}/api/subscription-requests/${id}/screenshot`).catch(() => null);
       if (!res || !res.ok) {
-        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-          res = await fetch(`http://localhost:5000/api/subscription-requests/${id}/screenshot`).catch(() => null);
-        }
+        const altUrl = API_BASE_URL.includes('localhost') 
+          ? 'https://goye-backend-bw8t.onrender.com' 
+          : 'http://localhost:5000';
+        res = await fetch(`${altUrl}/api/subscription-requests/${id}/screenshot`).catch(() => null);
       }
       if (res && res.ok) {
         const data = await res.json();
@@ -116,9 +121,10 @@ export default function SubscriptionRequests() {
     try {
       let response = await fetch(`${API_BASE_URL}/api/subscription-requests`).catch(() => null);
       if (!response || !response.ok) {
-        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-          response = await fetch(`http://localhost:5000/api/subscription-requests`).catch(() => null);
-        }
+        const altUrl = API_BASE_URL.includes('localhost') 
+          ? 'https://goye-backend-bw8t.onrender.com' 
+          : 'http://localhost:5000';
+        response = await fetch(`${altUrl}/api/subscription-requests`).catch(() => null);
       }
       if (response && response.ok) {
         const data = await response.json();
@@ -162,13 +168,14 @@ export default function SubscriptionRequests() {
         body: JSON.stringify({ status })
       }).catch(() => null);
       if (!response || !response.ok) {
-        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-          response = await fetch(`http://localhost:5000/api/subscription-requests/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-          }).catch(() => null);
-        }
+        const altUrl = API_BASE_URL.includes('localhost') 
+          ? 'https://goye-backend-bw8t.onrender.com' 
+          : 'http://localhost:5000';
+        response = await fetch(`${altUrl}/api/subscription-requests/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        }).catch(() => null);
       }
       if (response && response.ok) {
         const data = await response.json();
