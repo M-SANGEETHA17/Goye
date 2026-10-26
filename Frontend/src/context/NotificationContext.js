@@ -133,8 +133,6 @@ export const NotificationProvider = ({ children }) => {
           localStorage.setItem('credits', '99999');
           localStorage.removeItem('freeTrialEnded');
           window.dispatchEvent(new Event('creditsChanged'));
-          window.dispatchEvent(new Event('freeUserLoginStatusChanged'));
-          window.dispatchEvent(new Event('loginStatusChanged'));
           return;
         }
 
