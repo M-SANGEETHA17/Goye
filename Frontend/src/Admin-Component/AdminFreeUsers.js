@@ -9,8 +9,21 @@ import { FaWhatsapp } from "react-icons/fa";
 const API_BASE_URL = (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com").replace(/\/+$/, "");
 
 export default function AdminFreeUsers() {
-  const [freeUsers, setFreeUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [freeUsers, setFreeUsers] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("goye_free_users");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !sessionStorage.getItem("goye_free_users");
+    } catch (e) {
+      return true;
+    }
+  });
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");

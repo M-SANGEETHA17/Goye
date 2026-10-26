@@ -41,26 +41,92 @@ const filters = ["All", "Pending", "Approved", "Rejected"];
 
 export default function SubscriptionRequests() {
   const [filter, setFilter] = useState("Pending");
-  const [requests, setRequests] = useState([]);
+  const [requests, setRequests] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("goye_subscription_requests");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [query, setQuery] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(null);
+  const [screenshotCache, setScreenshotCache] = useState({});
+  const [loadingScreenshots, setLoadingScreenshots] = useState({});
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  const fetchScreenshotForRequest = async (id) => {
+    if (!id) return null;
+    if (screenshotCache[id]) return screenshotCache[id];
+    setLoadingScreenshots(prev => ({ ...prev, [id]: true }));
+    try {
+      let res = await fetch(`${API_BASE_URL}/api/subscription-requests/${id}/screenshot`).catch(() => null);
+      if (!res || !res.ok) {
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+          res = await fetch(`http://localhost:5000/api/subscription-requests/${id}/screenshot`).catch(() => null);
+        }
+      }
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data.success && data.screenshot) {
+          setScreenshotCache(prev => ({ ...prev, [id]: data.screenshot }));
+          setRequests(prev => prev.map(r => r._id === id ? { ...r, screenshot: data.screenshot } : r));
+          return data.screenshot;
+        }
+      }
+    } catch (e) {
+      console.error("Error loading screenshot:", e);
+    } finally {
+      setLoadingScreenshots(prev => ({ ...prev, [id]: false }));
+    }
+    return null;
+  };
+
+  const handleOpenScreenshot = async (r) => {
+    const existing = r.screenshot || screenshotCache[r._id];
+    if (existing) {
+      setPreviewImage(existing);
+      return;
+    }
+    const shot = await fetchScreenshotForRequest(r._id);
+    if (shot) {
+      setPreviewImage(shot);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedRequest && selectedRequest.hasScreenshot && !selectedRequest.screenshot && !screenshotCache[selectedRequest._id]) {
+      fetchScreenshotForRequest(selectedRequest._id).then(shot => {
+        if (shot) {
+          setSelectedRequest(prev => prev && prev._id === selectedRequest._id ? { ...prev, screenshot: shot } : prev);
+        }
+      });
+    }
+  }, [selectedRequest]);
+
   const fetchRequests = async (showAnim = false) => {
     if (showAnim) setIsRefreshing(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/subscription-requests`);
-      if (response.ok) {
+      let response = await fetch(`${API_BASE_URL}/api/subscription-requests`).catch(() => null);
+      if (!response || !response.ok) {
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+          response = await fetch(`http://localhost:5000/api/subscription-requests`).catch(() => null);
+        }
+      }
+      if (response && response.ok) {
         const data = await response.json();
-        if (data.success) {
-          setRequests(data.requests || []);
+        if (data.success && Array.isArray(data.requests)) {
+          setRequests(data.requests);
+          try {
+            sessionStorage.setItem("goye_subscription_requests", JSON.stringify(data.requests));
+          } catch (e) {}
         }
       }
     } catch (err) {
@@ -74,7 +140,7 @@ export default function SubscriptionRequests() {
 
   useEffect(() => {
     fetchRequests(false);
-    const interval = setInterval(() => fetchRequests(false), 4000);
+    const interval = setInterval(() => fetchRequests(false), 15000);
     const handleFocus = () => fetchRequests(false);
     const handleSync = () => fetchRequests(false);
     window.addEventListener("focus", handleFocus);
@@ -90,12 +156,21 @@ export default function SubscriptionRequests() {
 
   const updateStatus = async (id, status) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/subscription-requests/${id}`, {
+      let response = await fetch(`${API_BASE_URL}/api/subscription-requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
-      });
-      if (response.ok) {
+      }).catch(() => null);
+      if (!response || !response.ok) {
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+          response = await fetch(`http://localhost:5000/api/subscription-requests/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+          }).catch(() => null);
+        }
+      }
+      if (response && response.ok) {
         const data = await response.json();
         if (data.success) {
           setRequests((prev) => prev.map((r) => r._id === id ? { ...r, status } : r));
@@ -504,22 +579,32 @@ export default function SubscriptionRequests() {
 
                         {/* PAYMENT SCREENSHOT */}
                         <td className="py-3.5 px-4 align-middle">
-                          {r.screenshot ? (
+                          {(r.screenshot || r.hasScreenshot || screenshotCache[r._id]) ? (
                             <button
                               type="button"
-                              onClick={() => setPreviewImage(r.screenshot)}
+                              onClick={() => handleOpenScreenshot(r)}
                               className="relative group/thumb block rounded-xl overflow-hidden border border-emerald-200 hover:border-emerald-500 shadow-2xs transition-all focus:outline-none cursor-pointer"
-                              title="Click to enlarge payment screenshot"
+                              title="Click to view payment screenshot proof"
                             >
-                              <img 
-                                src={r.screenshot} 
-                                alt="Payment proof" 
-                                className="w-10 h-10 object-cover rounded-xl group-hover/thumb:scale-110 transition-transform duration-200" 
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                                }}
-                              />
+                              {(r.screenshot || screenshotCache[r._id]) ? (
+                                <img 
+                                  src={r.screenshot || screenshotCache[r._id]} 
+                                  alt="Payment proof" 
+                                  className="w-10 h-10 object-cover rounded-xl group-hover/thumb:scale-110 transition-transform duration-200" 
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-emerald-50 hover:bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 transition">
+                                  {loadingScreenshots[r._id] ? (
+                                    <RefreshCw size={14} className="animate-spin text-emerald-600" />
+                                  ) : (
+                                    <Eye size={16} />
+                                  )}
+                                </div>
+                              )}
                               <div className="hidden w-10 h-10 bg-slate-100 rounded-xl items-center justify-center text-slate-400 text-[9px] font-bold">
                                 Invalid
                               </div>
@@ -680,23 +765,23 @@ export default function SubscriptionRequests() {
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                     <Image size={11} className="text-emerald-600"/> Payment Screenshot
                   </span>
-                  {selectedRequest.screenshot && (
+                  {(selectedRequest.screenshot || screenshotCache[selectedRequest._id]) && (
                     <button 
                       type="button"
-                      onClick={() => setPreviewImage(selectedRequest.screenshot)}
+                      onClick={() => setPreviewImage(selectedRequest.screenshot || screenshotCache[selectedRequest._id])}
                       className="text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer hover:underline"
                     >
                       <ZoomIn size={12}/> Full Preview
                     </button>
                   )}
                 </div>
-                {selectedRequest.screenshot ? (
+                {(selectedRequest.screenshot || screenshotCache[selectedRequest._id]) ? (
                   <div 
-                    onClick={() => setPreviewImage(selectedRequest.screenshot)}
+                    onClick={() => setPreviewImage(selectedRequest.screenshot || screenshotCache[selectedRequest._id])}
                     className="cursor-pointer group relative rounded-xl overflow-hidden border border-slate-200 bg-black/5 max-h-56 flex items-center justify-center"
                   >
                     <img 
-                      src={selectedRequest.screenshot} 
+                      src={selectedRequest.screenshot || screenshotCache[selectedRequest._id]} 
                       alt="Payment Receipt" 
                       className="max-h-56 w-full object-contain rounded-lg"
                       onError={(e) => {
@@ -710,6 +795,11 @@ export default function SubscriptionRequests() {
                     <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
                       <ZoomIn size={15} /> Click to Enlarge
                     </div>
+                  </div>
+                ) : (selectedRequest.hasScreenshot || loadingScreenshots[selectedRequest._id]) ? (
+                  <div className="p-6 text-center bg-white rounded-xl border border-emerald-100 flex flex-col items-center justify-center gap-2">
+                    <RefreshCw size={20} className="animate-spin text-emerald-600" />
+                    <span className="text-xs text-emerald-800 font-semibold">Loading payment proof image...</span>
                   </div>
                 ) : (
                   <p className="text-xs text-slate-400 italic py-1">No payment screenshot attached.</p>

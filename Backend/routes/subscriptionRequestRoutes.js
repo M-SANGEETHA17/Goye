@@ -34,17 +34,40 @@ router.post('/', async (req, res) => {
     }
 });
 
-// 2. Get all requests (newest first)
+// 2. Get all requests (newest first - optimized lightweight list)
 router.get('/', async (req, res) => {
     try {
         const mongoose = require('mongoose');
         if (mongoose.connection.readyState !== 1) {
             return res.json({ success: true, requests: [] });
         }
-        const requests = await SubscriptionRequest.find().sort({ createdAt: -1 });
-        return res.json({ success: true, requests });
+        const [requests, withScreenshots] = await Promise.all([
+            SubscriptionRequest.find({}, { screenshot: 0 }).sort({ createdAt: -1 }).lean(),
+            SubscriptionRequest.find({ screenshot: { $exists: true, $ne: '' } }, { _id: 1 }).lean()
+        ]);
+        const screenshotIdSet = new Set(withScreenshots.map(d => String(d._id)));
+        const mapped = requests.map(r => ({
+            ...r,
+            hasScreenshot: screenshotIdSet.has(String(r._id))
+        }));
+        return res.json({ success: true, requests: mapped });
     } catch (err) {
+        console.error('Error fetching subscription requests:', err);
         return res.json({ success: true, requests: [] });
+    }
+});
+
+// 2.1 Get single screenshot by ID on-demand
+router.get('/:id/screenshot', async (req, res) => {
+    try {
+        const doc = await SubscriptionRequest.findById(req.params.id, { screenshot: 1 });
+        if (!doc || !doc.screenshot) {
+            return res.status(404).json({ success: false, message: 'Screenshot not found' });
+        }
+        return res.json({ success: true, screenshot: doc.screenshot });
+    } catch (err) {
+        console.error('Error fetching request screenshot:', err);
+        return res.status(500).json({ success: false, message: 'Failed to fetch screenshot' });
     }
 });
 
