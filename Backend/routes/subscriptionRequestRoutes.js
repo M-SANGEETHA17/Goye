@@ -38,18 +38,51 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const mongoose = require('mongoose');
-        if (mongoose.connection.readyState !== 1) {
-            return res.json({ success: true, requests: [] });
+        
+        // Wait up to 5s if Mongoose is currently establishing connection
+        if (mongoose.connection.readyState === 2) {
+            for (let i = 0; i < 25; i++) {
+                if (mongoose.connection.readyState === 1) break;
+                await new Promise(r => setTimeout(r, 200));
+            }
         }
-        const [requests, withScreenshots] = await Promise.all([
-            SubscriptionRequest.find({}, { screenshot: 0 }).sort({ createdAt: -1 }).lean(),
-            SubscriptionRequest.find({ screenshot: { $exists: true, $ne: '' } }, { _id: 1 }).lean()
-        ]);
-        const screenshotIdSet = new Set(withScreenshots.map(d => String(d._id)));
-        const mapped = requests.map(r => ({
+
+        let requests = [];
+        try {
+            requests = await SubscriptionRequest.find({}, { screenshot: 0 }).sort({ createdAt: -1 }).lean();
+        } catch (e) {
+            console.error('Mongoose find error, trying native db:', e.message);
+        }
+
+        // Native db collection fallback if Mongoose query returned empty or failed
+        if (!requests || requests.length === 0) {
+            try {
+                if (mongoose.connection.db) {
+                    requests = await mongoose.connection.db.collection('subscriptionrequests')
+                        .find({}, { projection: { screenshot: 0 } })
+                        .sort({ createdAt: -1 })
+                        .toArray();
+                }
+            } catch (errDb) {
+                console.error('Native collection fetch error:', errDb.message);
+            }
+        }
+
+        let screenshotIdSet = new Set();
+        try {
+            if (mongoose.connection.db) {
+                const withShots = await mongoose.connection.db.collection('subscriptionrequests')
+                    .find({ screenshot: { $exists: true, $ne: '' } }, { projection: { _id: 1 } })
+                    .toArray();
+                screenshotIdSet = new Set(withShots.map(d => String(d._id)));
+            }
+        } catch (e) {}
+
+        const mapped = (requests || []).map(r => ({
             ...r,
-            hasScreenshot: screenshotIdSet.has(String(r._id))
+            hasScreenshot: screenshotIdSet.has(String(r._id)) || !!r.hasScreenshot
         }));
+
         return res.json({ success: true, requests: mapped });
     } catch (err) {
         console.error('Error fetching subscription requests:', err);
@@ -60,11 +93,28 @@ router.get('/', async (req, res) => {
 // 2.1 Get single screenshot by ID on-demand
 router.get('/:id/screenshot', async (req, res) => {
     try {
-        const doc = await SubscriptionRequest.findById(req.params.id, { screenshot: 1 });
-        if (!doc || !doc.screenshot) {
+        const mongoose = require('mongoose');
+        let screenshot = null;
+        try {
+            const doc = await SubscriptionRequest.findById(req.params.id, { screenshot: 1 });
+            if (doc && doc.screenshot) screenshot = doc.screenshot;
+        } catch (e) {}
+
+        if (!screenshot && mongoose.connection.db) {
+            try {
+                const { ObjectId } = require('mongodb');
+                const doc = await mongoose.connection.db.collection('subscriptionrequests').findOne(
+                    { _id: new ObjectId(req.params.id) },
+                    { projection: { screenshot: 1 } }
+                );
+                if (doc && doc.screenshot) screenshot = doc.screenshot;
+            } catch (e) {}
+        }
+
+        if (!screenshot) {
             return res.status(404).json({ success: false, message: 'Screenshot not found' });
         }
-        return res.json({ success: true, screenshot: doc.screenshot });
+        return res.json({ success: true, screenshot });
     } catch (err) {
         console.error('Error fetching request screenshot:', err);
         return res.status(500).json({ success: false, message: 'Failed to fetch screenshot' });
