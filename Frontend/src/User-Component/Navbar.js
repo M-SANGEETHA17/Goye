@@ -173,7 +173,8 @@ export default function Navbar() {
         setActiveToast(unreadNotif);
         const isApproved = unreadNotif.type === 'request_approved' || 
           (unreadNotif.title && (unreadNotif.title.includes('Activated') || unreadNotif.title.includes('Queued') || unreadNotif.title.includes('Approved')));
-        if (!isFreeUserLoggedInLocal && isApproved && localStorage.getItem('isSubscribed') !== 'true') {
+        const lastCheckExpired = localStorage.getItem('sub_check_expired') === 'true';
+        if (!isFreeUserLoggedInLocal && isApproved && localStorage.getItem('isSubscribed') !== 'true' && !lastCheckExpired) {
           localStorage.setItem('isSubscribed', 'true');
           localStorage.setItem('credits', '99999');
           window.dispatchEvent(new Event('creditsChanged'));

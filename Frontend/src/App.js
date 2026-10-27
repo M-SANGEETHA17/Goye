@@ -149,6 +149,7 @@ function CreditLimitGuard({ children }) {
         );
 
         if (isStillValid) {
+          localStorage.removeItem("sub_check_expired");
           localStorage.removeItem("freeUserToken");
           localStorage.removeItem("freeUserData");
           localStorage.setItem("isLoggedIn", "true");
@@ -168,6 +169,7 @@ function CreditLimitGuard({ children }) {
           window.dispatchEvent(new Event("freeUserLoginStatusChanged"));
           window.dispatchEvent(new Event("loginStatusChanged"));
         } else {
+          localStorage.setItem("sub_check_expired", "true");
           localStorage.setItem("isSubscribed", "false");
           localStorage.removeItem("subscriptionPlan");
           if (uData.subscriptionExpiresAt) {

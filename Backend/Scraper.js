@@ -171,6 +171,9 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
         "--disable-gpu",
         "--disable-software-rasterizer",
         "--no-zygote",
+        "--single-process",
+        "--disable-background-networking",
+        "--mute-audio",
         "--window-size=1280,900"
       ]
     });
@@ -182,6 +185,15 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
       locale: "en-IN",
       geolocation: { longitude: 80.2707, latitude: 13.0827 },
       permissions: ["geolocation"]
+    });
+
+    // Block heavy media/images to save 80% RAM on Render cloud free tier
+    await context.route("**/*", (route) => {
+      const type = route.request().resourceType();
+      if (["image", "media", "font"].includes(type)) {
+        return route.abort();
+      }
+      return route.continue();
     });
 
     const page = await context.newPage();

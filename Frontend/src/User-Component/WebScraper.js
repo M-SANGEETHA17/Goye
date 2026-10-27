@@ -68,6 +68,18 @@ export default function WebScraper() {
     });
     socketRef.current = socket;
 
+    socket.on("connect", () => {
+      console.log("✅ [WebScraper] Socket.IO connected");
+    });
+
+    socket.on("connect_error", (err) => {
+      console.warn("⚠️ [WebScraper] Socket connect error:", err);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.warn("⚠️ [WebScraper] Socket disconnected:", reason);
+    });
+
     // A new listing arrived — append immediately
     socket.on("scrape_lead", (lead) => {
       setLeadsData((prev) => {
@@ -257,14 +269,54 @@ export default function WebScraper() {
     setTimeout(() => setToast({ show: false, type: "", message: "" }), 3000);
   };
 
-  const handleStartScrape = (e) => {
+  const triggerRestFallback = async () => {
+    try {
+      const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
+      const localUrl = window.location.hostname === "localhost" ? "https://goye-backend-bw8t.onrender.com" : apiBase;
+      const res = await fetch(`${localUrl}/api/scrape-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: searchQuery.trim(),
+          location: (locationQuery || "").trim()
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.leads) && data.leads.length > 0) {
+          setLeadsData(data.leads);
+          setSelectedIds(data.leads.map((l) => l.id));
+          setHasScrapped(true);
+          setScrapeFailed(false);
+          setIsScraping(false);
+          setToast({
+            show: true,
+            type: "success",
+            message: `🎉 Found ${data.leads.length} real results from Google Maps!`
+          });
+          setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
+          return;
+        }
+      }
+      throw new Error("No listings found for this query.");
+    } catch (err) {
+      console.error("WebScraper REST error:", err);
+      setIsScraping(false);
+      setHasScrapped(true);
+      setScrapeFailed(true);
+      setToast({ show: true, type: "error", message: `❌ ${err.message || "Failed to scrape listings."}` });
+      setTimeout(() => setToast({ show: false, type: "", message: "" }), 5000);
+    }
+  };
+
+  const handleStartScrape = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) {
       setToast({ show: true, type: "error", message: "Please enter a search query!" });
       setTimeout(() => setToast({ show: false, type: "", message: "" }), 3000);
       return;
     }
-    if (!socketRef.current) return;
 
     // Clear previous results
     setLeadsData([]);
@@ -278,11 +330,27 @@ export default function WebScraper() {
       sessionStorage.removeItem("goye_web_scraper_selected");
     } catch (e) {}
 
-    // Emit to backend — results stream back via scrape_lead events
-    socketRef.current.emit("start_scrape", {
-      query: searchQuery,
-      location: locationQuery
-    });
+    // Check if socket is connected
+    const socketConnected = socketRef.current && socketRef.current.connected;
+    if (socketConnected) {
+      socketRef.current.emit("start_scrape", {
+        query: searchQuery,
+        location: locationQuery
+      });
+
+      // Safety Watchdog: If no leads received within 15 seconds, seamlessly invoke REST fallback
+      setTimeout(() => {
+        setLeadsData((curr) => {
+          if (curr.length === 0) {
+            triggerRestFallback();
+          }
+          return curr;
+        });
+      }, 15000);
+    } else {
+      // Direct REST Fallback
+      await triggerRestFallback();
+    }
   };
 
   // ── Pagination computed values ──

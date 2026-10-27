@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import API_BASE_URL from '../config';
 
 const NotificationContext = createContext();
@@ -19,6 +19,12 @@ export const NotificationProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(false);
 
+  // Throttling and loop-prevention refs
+  const lastFetchNotifTimeRef = useRef(0);
+  const fetchingNotifRef = useRef(false);
+  const lastFetchCreditsTimeRef = useRef(0);
+  const fetchingCreditsRef = useRef(false);
+
   // Fetch notifications for the currently logged-in user
   const fetchNotifications = useCallback(async () => {
     let email = localStorage.getItem('email');
@@ -29,6 +35,12 @@ export const NotificationProvider = ({ children }) => {
       } catch (e) {}
     }
     if (!email) return;
+
+    if (fetchingNotifRef.current || (Date.now() - lastFetchNotifTimeRef.current < 2500)) {
+      return;
+    }
+    fetchingNotifRef.current = true;
+    lastFetchNotifTimeRef.current = Date.now();
 
     try {
       setLoading(true);
@@ -51,7 +63,8 @@ export const NotificationProvider = ({ children }) => {
             )
           );
           const isFreeUserActive = !!localStorage.getItem('freeUserToken') || !!localStorage.getItem('freeUserData');
-          if (!isFreeUserActive && hasApprovalNotif && localStorage.getItem('isSubscribed') !== 'true') {
+          const lastCheckExpired = localStorage.getItem('sub_check_expired') === 'true';
+          if (!isFreeUserActive && hasApprovalNotif && localStorage.getItem('isSubscribed') !== 'true' && !lastCheckExpired) {
             localStorage.setItem('isSubscribed', 'true');
             localStorage.setItem('credits', '99999');
             window.dispatchEvent(new Event('creditsChanged'));
@@ -62,6 +75,7 @@ export const NotificationProvider = ({ children }) => {
     } catch (err) {
       console.error('Error in fetchNotifications:', err);
     } finally {
+      fetchingNotifRef.current = false;
       setLoading(false);
     }
   }, []);
@@ -80,6 +94,12 @@ export const NotificationProvider = ({ children }) => {
     }
 
     if (!email && !freeUserId) return;
+
+    if (fetchingCreditsRef.current || (Date.now() - lastFetchCreditsTimeRef.current < 2500)) {
+      return;
+    }
+    fetchingCreditsRef.current = true;
+    lastFetchCreditsTimeRef.current = Date.now();
 
     try {
       const apiBaseUrl = API_BASE_URL;
@@ -102,6 +122,7 @@ export const NotificationProvider = ({ children }) => {
         );
 
         if (isStillValid) {
+          localStorage.removeItem('sub_check_expired');
           // User has an active paid subscription: Auto-purge stale free user data permanently
           localStorage.removeItem('freeUserToken');
           localStorage.removeItem('freeUserData');
@@ -153,6 +174,7 @@ export const NotificationProvider = ({ children }) => {
           window.dispatchEvent(new Event('creditsChanged'));
           return;
         } else {
+          localStorage.setItem('sub_check_expired', 'true');
           localStorage.setItem('isSubscribed', 'false');
           localStorage.removeItem('upcomingPlan');
           localStorage.removeItem('upcomingPlanStartsAt');
@@ -205,6 +227,8 @@ export const NotificationProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Error in fetchCredits:', err);
+    } finally {
+      fetchingCreditsRef.current = false;
     }
   }, []);
 
