@@ -5,12 +5,12 @@ const { extractPhoneFromWebsite } = require("./utils/socialLinkExtractor");
 async function fetchMobilePhone(context, listingUrl, fallbackWebsite = null) {
   const detailPage = await context.newPage();
   try {
-    await detailPage.goto(listingUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+    await detailPage.goto(listingUrl, { waitUntil: "domcontentloaded", timeout: 7000 });
     let rawPhone = null;
     let website = fallbackWebsite;
 
     try {
-      await detailPage.waitForSelector('button[data-item-id^="phone:"], button[aria-label*="Phone"], a[href^="tel:"], a[data-item-id="authority"]', { timeout: 3500 });
+      await detailPage.waitForSelector('button[data-item-id^="phone:"], button[aria-label*="Phone"], a[href^="tel:"], a[data-item-id="authority"]', { timeout: 2000 });
     } catch (_) {}
 
     const extracted = await detailPage.evaluate(() => {
@@ -411,7 +411,7 @@ async function fallbackScrapeLeads(searchQuery, locationQuery, callbacks = {}) {
     try {
       const groqKey = (process.env.GROQ_API_KEY || "").trim();
       if (groqKey) {
-        const groqModels = ["openai/gpt-oss-20b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile"];
+        const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"];
         const prompt = `You are a verified business directory database for India.
 List 12 to 15 REAL, verified businesses for:
 Niche: "${searchQuery}"
