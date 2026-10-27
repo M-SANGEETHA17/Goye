@@ -171,7 +171,6 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
         "--disable-gpu",
         "--disable-software-rasterizer",
         "--no-zygote",
-        "--single-process",
         "--disable-background-networking",
         "--mute-audio",
         "--window-size=1280,900"

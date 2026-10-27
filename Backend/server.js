@@ -22,13 +22,25 @@ const processedAiMessageIds = new Set();
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io CORS setup
+// Universal CORS setup for Socket.io
 const io = new Server(server, {
-  cors: { origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : true, methods: ["GET", "POST"] },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true
+  },
   maxHttpBufferSize: 1e8 // 100 MB limit for videos
 });
 
-app.use(cors());
+// Universal Express CORS (allows Render frontend, lcind.space, localhost)
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
+}));
+app.options("*", cors());
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
