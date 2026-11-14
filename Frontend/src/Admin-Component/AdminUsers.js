@@ -205,11 +205,34 @@ export default function AdminUsers() {
     return map;
   }, [sortedUsersAsc]);
 
+  const activeSubscribersCount = useMemo(() => {
+    const now = Date.now();
+    return users.filter(u => {
+      const expTime = u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).getTime() : 0;
+      return Boolean((u.isSubscribed && (!u.subscriptionExpiresAt || expTime > now)) || (expTime > now));
+    }).length;
+  }, [users]);
+
+  const expiringSoonCount = useMemo(() => {
+    const now = Date.now();
+    return users.filter(u => {
+      const expTime = u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).getTime() : 0;
+      const daysLeft = expTime > now ? Math.ceil((expTime - now) / (1000 * 60 * 60 * 24)) : 0;
+      return expTime > now && daysLeft > 0 && daysLeft <= 5;
+    }).length;
+  }, [users]);
+
   const filteredUsers = useMemo(() => {
+    const now = Date.now();
     return users.filter(user => {
-      const isSub = user.isSubscribed && user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt).getTime() > Date.now();
+      const expTime = user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).getTime() : 0;
+      const isSub = Boolean((user.isSubscribed && (!user.subscriptionExpiresAt || expTime > now)) || (expTime > now));
+      const daysLeft = expTime > now ? Math.ceil((expTime - now) / (1000 * 60 * 60 * 24)) : 0;
+      const isExpSoon = isSub && daysLeft > 0 && daysLeft <= 5;
+
       if (statusFilter === "Active" && !isSub) return false;
       if (statusFilter === "Expired" && isSub) return false;
+      if (statusFilter === "Expiring Soon" && !isExpSoon) return false;
 
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
@@ -218,7 +241,8 @@ export default function AdminUsers() {
         (user.email && user.email.toLowerCase().includes(q)) ||
         (user.phone && user.phone.includes(q)) ||
         (user.businessName && user.businessName.toLowerCase().includes(q)) ||
-        (user.businessType && user.businessType.toLowerCase().includes(q))
+        (user.businessType && user.businessType.toLowerCase().includes(q)) ||
+        (user.subscriptionPlan && user.subscriptionPlan.toLowerCase().includes(q))
       );
     });
   }, [users, searchQuery, statusFilter]);
@@ -229,10 +253,6 @@ export default function AdminUsers() {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredUsers.slice(start, start + itemsPerPage);
   }, [filteredUsers, currentPage]);
-
-  const activeSubscribersCount = users.filter(u => 
-    u.isSubscribed && u.subscriptionExpiresAt && new Date(u.subscriptionExpiresAt).getTime() > Date.now()
-  ).length;
 
   return (
     <div className="admin-main-content min-h-screen bg-gradient-to-br from-[#f0fdf4] via-[#f8fafc] to-[#ecfdf5] font-sans text-slate-800 relative">
@@ -347,14 +367,14 @@ export default function AdminUsers() {
             </div>
           </div>
 
-          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-amber-500">
+          <div className="glass-card stat-card-glow p-5 flex items-center justify-between border-l-4 border-l-rose-500">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Verified Members</p>
-              <h3 className="text-2xl md:text-3xl font-extrabold text-amber-900 mt-1">{Math.max(0, users.length - 1)}</h3>
-              <p className="text-[11px] text-amber-600 font-semibold mt-1">Full service access</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Expired Plans</p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-rose-900 mt-1">{Math.max(0, users.length - activeSubscribersCount)}</h3>
+              <p className="text-[11px] text-rose-600 font-semibold mt-1">Needs renewal / follow-up</p>
             </div>
-            <div className="w-13 h-13 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center ring-1 ring-amber-200/60 shadow-xs">
-              <ShieldCheck size={26} />
+            <div className="w-13 h-13 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center ring-1 ring-rose-200/60 shadow-xs">
+              <Clock size={26} />
             </div>
           </div>
         </div>
@@ -387,6 +407,7 @@ export default function AdminUsers() {
             {[
               { label: "All", count: users.length },
               { label: "Active", count: activeSubscribersCount },
+              { label: "Expiring Soon", count: expiringSoonCount },
               { label: "Expired", count: Math.max(0, users.length - activeSubscribersCount) }
             ].map(tab => {
               const active = statusFilter === tab.label;
@@ -399,13 +420,23 @@ export default function AdminUsers() {
                   }}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     active
-                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                      ? tab.label === "Expired" 
+                        ? "bg-rose-600 text-white shadow-md shadow-rose-600/20"
+                        : tab.label === "Expiring Soon"
+                        ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+                        : "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
                       : "bg-slate-100/90 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
                   }`}
                 >
                   <span>{tab.label}</span>
                   <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
-                    active ? "bg-emerald-800 text-emerald-100" : "bg-slate-200 text-slate-700"
+                    active 
+                      ? tab.label === "Expired" 
+                        ? "bg-rose-800 text-rose-100" 
+                        : tab.label === "Expiring Soon"
+                        ? "bg-amber-800 text-amber-100"
+                        : "bg-emerald-800 text-emerald-100" 
+                      : "bg-slate-200 text-slate-700"
                   }`}>
                     {tab.count}
                   </span>
@@ -425,13 +456,14 @@ export default function AdminUsers() {
         {/* Modern Table Container */}
         <div className="glass-card overflow-hidden border border-emerald-200/70 shadow-sm">
           <div className="overflow-x-auto custom-scroll">
-            <table className="w-full text-left border-collapse min-w-[980px]">
+            <table className="w-full text-left border-collapse min-w-[1120px]">
               <thead>
                 <tr className="bg-gradient-to-r from-emerald-50/90 to-teal-50/60 border-b border-emerald-100 text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider">
-                  <th className="py-4 pl-6 pr-4 w-[240px]">User Profile</th>
-                  <th className="py-4 px-4 w-[210px]">Contact Info</th>
-                  <th className="py-4 px-4 w-[165px]">Password</th>
-                  <th className="py-4 px-4 w-[180px]">Business Info</th>
+                  <th className="py-4 pl-6 pr-4 w-[260px] whitespace-nowrap">User Profile</th>
+                  <th className="py-4 px-4 w-[190px]">Contact Info</th>
+                  <th className="py-4 px-4 w-[150px]">Password</th>
+                  <th className="py-4 px-4 w-[170px]">Business Info</th>
+                  <th className="py-4 px-4 w-[210px]">Plan & Status</th>
                   <th className="py-4 px-4 w-[130px]">Joined Date</th>
                   <th className="py-4 pl-4 pr-6 text-right w-[240px]">Actions</th>
                 </tr>
@@ -439,7 +471,7 @@ export default function AdminUsers() {
               <tbody className="divide-y divide-emerald-50/80 bg-white/70">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center">
+                    <td colSpan={7} className="py-20 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="w-9 h-9 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                         <span className="text-sm font-bold text-slate-700">Loading Subscribed Users data...</span>
@@ -448,7 +480,7 @@ export default function AdminUsers() {
                   </tr>
                 ) : paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-16 text-center">
+                    <td colSpan={7} className="py-16 text-center">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                         <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
                           <Users size={28} />
@@ -512,6 +544,11 @@ export default function AdminUsers() {
                               <p className="truncate max-w-[160px]">{user.businessName || "Not provided"}</p>
                               <p className="text-slate-400 font-medium">{user.businessType || "N/A"}</p>
                             </td>
+                            <td className="py-3.5 px-4 text-xs text-slate-600 font-bold align-middle">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {user.subscriptionPlan || "Standard"}
+                              </span>
+                            </td>
                             <td className="py-3.5 px-4 text-[11px] text-amber-700 font-bold uppercase tracking-wide align-middle">
                               Editing Mode
                             </td>
@@ -537,8 +574,8 @@ export default function AdminUsers() {
                         ) : (
                           /* Normal View Mode */
                           <>
-                            {/* USER PROFILE */}
-                            <td className="py-3.5 pl-6 pr-4 align-middle">
+                            {/* USER PROFILE - Clean Straight Line UI */}
+                            <td className="py-3.5 pl-6 pr-4 align-middle whitespace-nowrap">
                               <div className="flex items-center gap-3">
                                 <div className="relative shrink-0">
                                   <div className="w-10 h-10 rounded-xl avatar-gradient flex items-center justify-center text-white font-extrabold text-sm shadow-sm shadow-emerald-500/20 transition-transform duration-200 group-hover:scale-105">
@@ -549,15 +586,13 @@ export default function AdminUsers() {
                                     title="Active Member"
                                   />
                                 </div>
-                                <div className="min-w-0 pr-1">
-                                  <p className="font-bold text-slate-800 text-[13px] truncate group-hover:text-emerald-700 transition-colors" title={user.name}>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-bold text-slate-800 text-[13px] truncate max-w-[130px] group-hover:text-emerald-700 transition-colors" title={user.name}>
                                     {user.name || "Unnamed"}
-                                  </p>
-                                  <div className="mt-0.5">
-                                    <span className="font-mono-code text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-                                      ID: {seqId}
-                                    </span>
-                                  </div>
+                                  </span>
+                                  <span className="font-mono-code text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 whitespace-nowrap shrink-0">
+                                    ID: {seqId}
+                                  </span>
                                 </div>
                               </div>
                             </td>
@@ -628,6 +663,51 @@ export default function AdminUsers() {
                                   </span>
                                 )}
                               </div>
+                            </td>
+
+                            {/* PLAN & STATUS (Approach 1) */}
+                            <td className="py-3.5 px-4 align-middle">
+                              {(() => {
+                                const expTime = user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).getTime() : 0;
+                                const now = Date.now();
+                                const isSub = Boolean((user.isSubscribed && (!user.subscriptionExpiresAt || expTime > now)) || (expTime > now));
+                                const daysLeft = expTime > now ? Math.ceil((expTime - now) / (1000 * 60 * 60 * 24)) : 0;
+                                const isExpiringSoon = isSub && daysLeft > 0 && daysLeft <= 5;
+                                const planTitle = user.subscriptionPlan || (isSub ? "Pro Active" : "No Plan");
+
+                                return (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                      {isSub ? (
+                                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                                          isExpiringSoon
+                                            ? "bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs"
+                                            : "bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs"
+                                        }`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isExpiringSoon ? "bg-amber-500 animate-ping" : "bg-emerald-500 animate-pulse"}`}></span>
+                                          {isExpiringSoon ? `Expiring (${daysLeft}d left)` : `Active · ${daysLeft > 0 ? `${daysLeft}d left` : 'Lifetime'}`}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                          Expired
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1 truncate max-w-[170px]" title={planTitle}>
+                                      <Crown size={12} className={isSub ? (isExpiringSoon ? "text-amber-600" : "text-emerald-600") : "text-slate-400"} />
+                                      <span className="truncate">{planTitle}</span>
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                      {user.subscriptionExpiresAt ? (
+                                        `Exp: ${new Date(user.subscriptionExpiresAt).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'})}`
+                                      ) : (
+                                        isSub ? "No expiry set" : "No active validity"
+                                      )}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* JOINED ON */}

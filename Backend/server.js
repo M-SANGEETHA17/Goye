@@ -2156,6 +2156,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ message: "Please enter both email and password." });
     }
     const normalizedEmail = String(email).trim().toLowerCase();
+    const safeEmailRegex = new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
     
     // Fast path: Exact indexed match (runs in ~1-2ms using unique btree index)
     let user = await User.findOne({ email: normalizedEmail });
@@ -2163,7 +2164,6 @@ app.post('/api/login', async (req, res) => {
 
     // Fallback: Case-insensitive regex only if direct index lookup didn't hit
     if (!user) {
-      const safeEmailRegex = new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
       user = await User.findOne({ email: safeEmailRegex });
     }
 
@@ -2171,7 +2171,6 @@ app.post('/api/login', async (req, res) => {
     if (!user && mongoose.models.FreeUser) {
       user = await mongoose.models.FreeUser.findOne({ email: normalizedEmail });
       if (!user) {
-        const safeEmailRegex = new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
         user = await mongoose.models.FreeUser.findOne({ email: safeEmailRegex });
       }
       modelToUse = mongoose.models.FreeUser;
