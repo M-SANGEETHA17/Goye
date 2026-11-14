@@ -2226,8 +2226,17 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    user = await checkAndActivateQueuedPlan(user, modelToUse);
-    user = await checkAndApplyDailyReset(user, modelToUse);
+    try {
+      user = await checkAndActivateQueuedPlan(user, modelToUse);
+    } catch (planErr) {
+      console.error("Plan check err:", planErr);
+    }
+
+    try {
+      user = await checkAndApplyDailyReset(user, modelToUse);
+    } catch (resetErr) {
+      console.error("Daily reset err:", resetErr);
+    }
 
     const hasSubHistory = !!(user.subscriptionExpiresAt || user.subscriptionStartedAt || user.subscriptionPlan);
     const isSubscribed = Boolean(
@@ -2236,12 +2245,18 @@ app.post('/api/login', async (req, res) => {
       (user.upcomingPlanExpiresAt && new Date(user.upcomingPlanExpiresAt).getTime() > Date.now())
     );
     const isFreeUserModel = modelToUse === FreeUser || (user.constructor && user.constructor.modelName === 'FreeUser');
+    
     // Also check if the user exists in the FreeUser collection (they may have been auto-copied to User)
     let freeUserRecord = null;
-    if (isFreeUserModel) {
-      freeUserRecord = user;
-    } else if (mongoose.models.FreeUser) {
-      freeUserRecord = await mongoose.models.FreeUser.findOne({ email: safeEmailRegex });
+    try {
+      if (isFreeUserModel) {
+        freeUserRecord = user;
+      } else if (mongoose.models && mongoose.models.FreeUser) {
+        freeUserRecord = (await mongoose.models.FreeUser.findOne({ email: normalizedEmail })) || 
+                         (await mongoose.models.FreeUser.findOne({ email: safeEmailRegex }));
+      }
+    } catch (fErr) {
+      console.error("Free user record lookup err:", fErr);
     }
     const hasFreeUserRecord = !!freeUserRecord;
     
