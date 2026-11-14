@@ -269,8 +269,7 @@ export default function Subscriptions() {
             if (response.ok && data.success !== false) {
                 setConfirmError('');
                 setConfirmSuccess('Payment details captured successfully');
-                window.dispatchEvent(new Event('gy:subscription-request-created'));
-                window.dispatchEvent(new Event('renewPlanRequested'));
+                // User will see the confirmation screen and click "Close Window" button!
             } else {
                 setConfirmError(data.message || 'Failed to submit payment details. Please try again.');
             }
@@ -1313,11 +1312,16 @@ export default function Subscriptions() {
                                     type="button"
                                     onClick={() => {
                                         handleCloseConfirmModal();
-                                        navigate('/profile');
+                                        setModalPlan(null);
+                                        const storedEmail = localStorage.getItem("email") || localStorage.getItem("userEmail") || "";
+                                        if (storedEmail) localStorage.setItem(`renewRequested_${storedEmail}`, 'true');
+                                        window.dispatchEvent(new Event('renewPlanRequested'));
+                                        window.dispatchEvent(new Event('gy:subscription-request-created'));
+                                        navigate("/whatsapp-bulk-message-sender");
                                     }}
-                                    className="w-full py-4 px-6 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 text-white font-extrabold rounded-2xl transition-all text-sm cursor-pointer border border-white/20 shadow-lg hover:shadow-xl hover:-translate-y-1"
+                                    className="w-full py-4 px-6 bg-[#25D366] hover:bg-[#20ba5a] text-black font-extrabold rounded-2xl transition-all text-sm cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-1"
                                 >
-                                    Done
+                                    Close Window
                                 </button>
                             </div>
                         ) : (

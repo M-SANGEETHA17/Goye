@@ -1,3 +1,4 @@
+import { FaWhatsapp } from "react-icons/fa";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Search, Check, X, Eye, Clock,
@@ -56,6 +57,13 @@ export default function SubscriptionRequests() {
   const [query, setQuery] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [modalPhone, setModalPhone] = useState("");
+
+  useEffect(() => {
+    if (confirmAction && confirmAction.status === 'approved') {
+      setModalPhone(confirmAction.phone || "");
+    }
+  }, [confirmAction]);
   const [previewImage, setPreviewImage] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(null);
@@ -654,7 +662,7 @@ export default function SubscriptionRequests() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => setConfirmAction({ id: r._id, status: "approved" })}
+                                  onClick={() => setConfirmAction({ id: r._id, status: "approved", name: r.name, phone: r.phone || "", plan: r.plan, email: r.email })}
                                   className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
                                   title="Approve Request"
                                 >
@@ -662,7 +670,7 @@ export default function SubscriptionRequests() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setConfirmAction({ id: r._id, status: "rejected" })}
+                                  onClick={() => setConfirmAction({ id: r._id, status: "rejected", name: r.name, phone: r.phone || "", plan: r.plan, email: r.email })}
                                   className="p-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 transition-all duration-200 shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
                                   title="Reject Request"
                                 >
@@ -827,14 +835,14 @@ export default function SubscriptionRequests() {
               <div className="mt-5 flex gap-3 pt-3 border-t border-slate-100">
                 <button 
                   type="button"
-                  onClick={() => setConfirmAction({ id: selectedRequest._id, status: "rejected" })}
+                  onClick={() => setConfirmAction({ id: selectedRequest._id, status: "rejected", name: selectedRequest.name, phone: selectedRequest.phone || "", plan: selectedRequest.plan, email: selectedRequest.email })}
                   className="flex-1 py-2.5 rounded-xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition text-xs cursor-pointer"
                 >
                   Reject Request
                 </button>
                 <button 
                   type="button"
-                  onClick={() => setConfirmAction({ id: selectedRequest._id, status: "approved" })}
+                  onClick={() => setConfirmAction({ id: selectedRequest._id, status: "approved", name: selectedRequest.name, phone: selectedRequest.phone || "", plan: selectedRequest.plan, email: selectedRequest.email })}
                   className="flex-1 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-600/30 transition text-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Check size={14} /> Approve & Activate
@@ -889,44 +897,122 @@ export default function SubscriptionRequests() {
       {confirmAction && (
         <div className="fixed inset-0 md:left-[260px] z-[120] flex items-center justify-center p-4">
           <div className="fixed inset-0 backdrop-blur-md bg-slate-900/50" onClick={() => setConfirmAction(null)}></div>
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center z-10 border border-emerald-200">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-[420px] p-6 text-center z-10 border border-emerald-200">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3.5 ${
               confirmAction.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
             }`}>
-              {confirmAction.status === 'approved' ? <Check size={24} /> : <X size={24} />}
+              {confirmAction.status === 'approved' ? <FaWhatsapp size={24} className="text-emerald-500" /> : <X size={24} />}
             </div>
             <h3 className="text-base font-extrabold text-slate-900 mb-1">
-              {confirmAction.status === 'approved' ? 'Approve Subscription Request' : 'Reject Subscription Request'}
+              {confirmAction.status === 'approved' ? 'Approve & Notify on WhatsApp' : 'Reject Subscription Request'}
             </h3>
-            <p className="text-xs text-slate-500 mb-5 font-medium leading-relaxed">
+            <p className="text-xs text-slate-500 mb-4 font-medium leading-relaxed">
               {confirmAction.status === 'approved' 
-                ? "This will activate the user's subscription and award full member benefits immediately." 
+                ? "Activate subscription and send an instant approval confirmation message to the user via WhatsApp." 
                 : "This request will be marked as rejected."}
             </p>
-            <div className="flex gap-2.5">
-              <button 
-                type="button"
-                onClick={() => setConfirmAction(null)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button 
-                type="button"
-                onClick={async () => {
-                  const { id, status } = confirmAction;
-                  setConfirmAction(null);
-                  await updateStatus(id, status);
-                }}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-white transition text-xs shadow-md cursor-pointer ${
-                  confirmAction.status === 'approved' 
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/30' 
-                    : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
-                }`}
-              >
-                {confirmAction.status === 'approved' ? 'Confirm Approval' : 'Confirm Rejection'}
-              </button>
-            </div>
+
+            {confirmAction.status === 'approved' && (
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 mb-4 text-left space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-slate-500">User:</span>
+                  <span className="font-extrabold text-slate-800">{confirmAction.name || "Customer"}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-slate-500">Plan:</span>
+                  <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                    {confirmAction.plan || "Selected Plan"}
+                  </span>
+                </div>
+                <div className="pt-1.5 border-t border-slate-200/70">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1 flex items-center gap-1">
+                    <Phone size={11} className="text-emerald-600" /> WhatsApp Number
+                  </label>
+                  <input 
+                    type="text" 
+                    value={modalPhone}
+                    onChange={(e) => setModalPhone(e.target.value)}
+                    placeholder="Enter phone number (e.g. 9600086600)" 
+                    className="w-full text-xs font-mono-code font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {confirmAction.status === 'approved' ? (
+              <div className="space-y-2.5 pt-1">
+                {/* 1. Main Hero Button: Approve & Notify on WhatsApp */}
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const { id, name, plan } = confirmAction;
+                    const rawPhone = String(modalPhone || confirmAction.phone || '').trim();
+                    setConfirmAction(null);
+                    await updateStatus(id, 'approved');
+
+                    // Prepare WhatsApp notification
+                    const digitsOnly = rawPhone.replace(/[^0-9]/g, '');
+                    const finalPhone = digitsOnly.length === 10 ? `91${digitsOnly}` : digitsOnly;
+                    const planLabel = plan || 'Premium';
+                    const userName = name || 'Customer';
+                    const msg = `Hello ${userName},\n\nYour Goye subscription plan (${planLabel}) has been approved and activated successfully!\n\nYou can now log in at https://goye.in/userloginpage to access all premium features.\n\nThank you for choosing Goye!`;
+
+                    if (finalPhone) {
+                      const waUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`;
+                      window.open(waUrl, '_blank');
+                    }
+                  }}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-600/30 hover:shadow-lg hover:shadow-emerald-600/40 hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <FaWhatsapp size={16} className="text-white shrink-0" />
+                  <span>Approve & Notify on WhatsApp</span>
+                </button>
+
+                {/* 2. Secondary Row: Cancel & Approve Only */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button 
+                    type="button"
+                    onClick={() => setConfirmAction(null)}
+                    className="py-2.5 px-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 hover:border-slate-300 transition-all text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      const { id } = confirmAction;
+                      setConfirmAction(null);
+                      await updateStatus(id, 'approved');
+                    }}
+                    className="py-2.5 px-3 rounded-xl font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 hover:border-emerald-400 transition-all text-xs cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Check size={14} className="text-emerald-600" />
+                    <span>Approve Only</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2.5">
+                <button 
+                  type="button"
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const { id, status } = confirmAction;
+                    setConfirmAction(null);
+                    await updateStatus(id, status);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-rose-600/30 shadow-md transition text-xs cursor-pointer"
+                >
+                  Confirm Rejection
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

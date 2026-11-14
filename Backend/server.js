@@ -39,7 +39,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
 }));
-app.options("*", cors());
+app.options(/(.*)/, cors());
 
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
@@ -48,6 +48,22 @@ app.use('/api/subscription-requests', subscriptionRequestRoutes);
 
 const socialExtractorRoutes = require('./routes/socialExtractor');
 app.use('/api/social-extractor', socialExtractorRoutes);
+
+// Ultra-fast Health / Ping Endpoint for Zero-Delay Pre-warming & Keep-Alive
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', serverTime: Date.now() });
+});
+
+// Render Keep-Alive: Ping every 13 minutes to prevent free instance spin-down
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || "https://goye-backend-bw8t.onrender.com";
+setInterval(() => {
+  try {
+    const https = require('https');
+    https.get(`${RENDER_EXTERNAL_URL}/api/health`, (resp) => {
+      // Instance kept awake
+    }).on('error', () => {});
+  } catch (err) {}
+}, 13 * 60 * 1000);
 
 // Web Scraper API Endpoint
 app.post("/api/scrape-leads", async (req, res) => {
@@ -2140,20 +2156,30 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ message: "Please enter both email and password." });
     }
     const normalizedEmail = String(email).trim().toLowerCase();
-    const safeEmailRegex = new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
     
-    let user = await User.findOne({ email: safeEmailRegex });
+    // Fast path: Exact indexed match (runs in ~1-2ms using unique btree index)
+    let user = await User.findOne({ email: normalizedEmail });
     let modelToUse = User;
+
+    // Fallback: Case-insensitive regex only if direct index lookup didn't hit
+    if (!user) {
+      const safeEmailRegex = new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      user = await User.findOne({ email: safeEmailRegex });
+    }
 
     // Dual-lookup: If not found in User collection, check FreeUser collection!
     if (!user && mongoose.models.FreeUser) {
-      user = await mongoose.models.FreeUser.findOne({ email: safeEmailRegex });
+      user = await mongoose.models.FreeUser.findOne({ email: normalizedEmail });
+      if (!user) {
+        const safeEmailRegex = new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+        user = await mongoose.models.FreeUser.findOne({ email: safeEmailRegex });
+      }
       modelToUse = mongoose.models.FreeUser;
 
       // Auto-copy free user data into the User (subscribed users) collection
       // so they appear in the admin Subscribed Users panel.
       if (user) {
-        const existsInUserCol = await User.findOne({ email: safeEmailRegex });
+        const existsInUserCol = await User.findOne({ email: normalizedEmail });
         if (!existsInUserCol) {
           try {
             await new User({
@@ -2230,7 +2256,19 @@ app.post('/api/login', async (req, res) => {
     const realCredits = (freeUserRecord && freeUserRecord.credits !== undefined) ? freeUserRecord.credits : (user.credits || 0);
     const effectiveCredits = isSubscribed ? 99999 : (isActualFreeUserLogin ? realCredits : 0);
 
-    console.log(`🔍 LOGIN DEBUG: email=${user.email}, isSubscribed=${isSubscribed}, userCredits=${user.credits}, effectiveCredits=${effectiveCredits}`);
+    // Ultra-fast single DB check for pending subscription request
+    let hasPendingRequest = false;
+    if (mongoose.models.SubscriptionRequest) {
+      try {
+        const pendingDoc = await mongoose.models.SubscriptionRequest.findOne({
+          email: normalizedEmail,
+          status: "pending"
+        }).select('_id').lean();
+        if (pendingDoc) hasPendingRequest = true;
+      } catch (subErr) {}
+    }
+
+    console.log(`🔍 LOGIN DEBUG: email=${user.email}, isSubscribed=${isSubscribed}, hasPending=${hasPendingRequest}, effectiveCredits=${effectiveCredits}`);
 
     res.status(200).json({ 
       message: "Login successful!", 
@@ -2244,6 +2282,7 @@ app.post('/api/login', async (req, res) => {
       credits: effectiveCredits,
       totalSent: user.totalSent || 0,
       isSubscribed: isSubscribed,
+      hasPendingRequest: hasPendingRequest,
       subscriptionPlan: isSubscribed ? (user.subscriptionPlan || "Pro Plan") : (hasSubHistory ? (user.subscriptionPlan || "") : ""),
       subscriptionStartedAt: user.subscriptionStartedAt || null,
       subscriptionExpiresAt: user.subscriptionExpiresAt || null,

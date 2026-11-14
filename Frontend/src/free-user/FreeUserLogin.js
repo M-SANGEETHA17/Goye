@@ -19,6 +19,8 @@ export default function FreeUserLogin() {
   const [justRegistered, setJustRegistered] = useState(!!location.state?.registered);
 
   useEffect(() => {
+    // Ultra-fast backend pre-warming
+    fetch(`${API_BASE_URL}/api/health`).catch(() => {});
     if (justRegistered) {
       // One-shot banner; consume the navigation state so a refresh or
       // back/forward doesn't keep showing it.

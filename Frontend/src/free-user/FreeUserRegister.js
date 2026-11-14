@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { 
   FaUser, FaEnvelope, FaLock, FaBuilding, FaTag, FaPhone, 
@@ -49,6 +49,11 @@ export default function FreeUserRegister() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    // Ultra-fast backend pre-warming
+    fetch(`${API_BASE_URL}/api/health`).catch(() => {});
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

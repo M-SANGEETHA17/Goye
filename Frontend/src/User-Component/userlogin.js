@@ -27,6 +27,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
+  const [pendingModal, setPendingModal] = useState(false);
   const navigate = useNavigate();
   const justRegistered = !!location.state?.registered;
   const registeredName = location.state?.name;
@@ -45,8 +46,18 @@ export default function Login() {
     !!localStorage.getItem("username") ||
     Boolean(email && localStorage.getItem(`hasLoggedIn_${email}`) === "true");
 
-  // Popup entrance animation on mount
+  // Popup entrance animation on mount and clean session wipe + pre-warm backend
   useEffect(() => {
+    // Ultra-fast backend pre-warming so server and DB connection are hot
+    fetch(`${API_BASE_URL}/api/health`).catch(() => {});
+
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("user");
+    localStorage.removeItem("username");
+    localStorage.removeItem("token");
+    localStorage.removeItem("freeUserToken");
+    localStorage.removeItem("freeUserData");
+    window.dispatchEvent(new Event("loginStatusChanged"));
     const timer = setTimeout(() => setShow(true), 50);
     return () => clearTimeout(timer);
   }, []);
@@ -64,6 +75,13 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
+        // Direct pending approval check from login payload (Zero-delay, no extra network fetch)
+        if (data.hasPendingRequest) {
+          setLoading(false);
+          setPendingModal(true);
+          return;
+        }
+
         // Clear previous user cache
         localStorage.removeItem("lastExpiredPlan");
         localStorage.removeItem("lastExpiredTime");
@@ -356,6 +374,63 @@ export default function Login() {
           </span>
         </p>
       </div>
+
+      {/* Plan Request Under Review / Not Approved Yet Modal */}
+      {pendingModal && (
+        <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in text-center">
+          <div className="bg-[#0E1613] border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-[0_20px_70px_rgba(0,0,0,0.95)] relative flex flex-col items-center animate-scaleUp">
+            {/* Hourglass Icon */}
+            <div className="w-16 h-16 bg-amber-500/10 border-2 border-amber-500/40 text-amber-400 rounded-3xl flex items-center justify-center text-3xl mb-4 shadow-[0_0_30px_rgba(245,158,11,0.25)] animate-pulse">
+              ⏳
+            </div>
+
+            {/* Tag */}
+            <span className="text-[11px] font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 px-3 py-0.5 rounded-full uppercase tracking-wider mb-2 font-mono">
+              Review in Progress
+            </span>
+
+            {/* Title */}
+            <h3 className="text-xl sm:text-2xl font-black text-white mb-2 tracking-tight">
+              Plan Request Not Approved Yet
+            </h3>
+
+            {/* Subtext */}
+            <p className="text-xs sm:text-sm text-white/70 mb-5 leading-relaxed font-medium">
+              Your subscription request has been received and is currently under review by Admin. Your access will be automatically unlocked once approved.
+            </p>
+
+            {/* Admin Contact Box */}
+            <div className="w-full bg-[#121A16] border border-amber-500/30 rounded-2xl p-4 text-left mb-6">
+              <p className="text-xs text-white/50 font-bold uppercase tracking-wider mb-2">
+                For further queries, contact Admin:
+              </p>
+              <div className="flex flex-col gap-2.5">
+                <a
+                  href="tel:+919943042369"
+                  className="flex items-center gap-2.5 text-sm font-black text-[#25D366] hover:underline"
+                >
+                  <span>📞</span> +91 99430 42369
+                </a>
+                <a
+                  href="tel:+918148042369"
+                  className="flex items-center gap-2.5 text-sm font-black text-[#25D366] hover:underline"
+                >
+                  <span>📞</span> +91 81480 42369
+                </a>
+              </div>
+            </div>
+
+            {/* Got It Button */}
+            <button
+              type="button"
+              onClick={() => setPendingModal(false)}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+            >
+              OK, Got It
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

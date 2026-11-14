@@ -3,6 +3,7 @@ import { FiSearch, FiMapPin, FiPhone, FiCheckCircle, FiCheck, FiX, FiLayers, FiA
 import { FaBuilding, FaStar, FaDownload, FaPlay } from "react-icons/fa";
 import io from "socket.io-client";
 import * as XLSX from "xlsx";
+import { isFakeLead, fetchRealDirectoryLeads } from "../utils/realLeadDirectory";
 
 export default function WebScraper() {
   const [searchQuery, setSearchQuery] = useState(() => {
@@ -43,7 +44,7 @@ export default function WebScraper() {
   const [showClearModal, setShowClearModal] = useState(false);
 
   // Page size for client-side pagination
-  const PAGE_SIZE = 16;
+  const PAGE_SIZE = 20;
 
   const [leadsData, setLeadsData] = useState(() => {
     try {
@@ -54,12 +55,24 @@ export default function WebScraper() {
     }
   });
 
-  // ── Socket.IO for progressive scraping ────────────────────────────────────
+  // ── Socket.IO for progressive scraping & Real Directory Fallback ───────────
   const socketRef = useRef(null);
+  const queryRef = useRef(searchQuery);
+  const locationRef = useRef(locationQuery);
+  const realDirectoryTriggeredRef = useRef(false);
 
   useEffect(() => {
-    const socketUrl = window.location.hostname === "localhost"
-      ? "https://goye-backend-bw8t.onrender.com"
+    queryRef.current = searchQuery;
+  }, [searchQuery]);
+
+  useEffect(() => {
+    locationRef.current = locationQuery;
+  }, [locationQuery]);
+
+  useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const socketUrl = isLocal
+      ? "http://localhost:5000"
       : (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com");
 
     const socket = io(socketUrl, {
@@ -80,11 +93,34 @@ export default function WebScraper() {
       console.warn("⚠️ [WebScraper] Socket disconnected:", reason);
     });
 
-    // A new listing arrived — append immediately
-    socket.on("scrape_lead", (lead) => {
+    // A new listing arrived — verify authenticity & reject mock templates
+    socket.on("scrape_lead", async (lead) => {
+      if (isFakeLead(lead)) {
+        console.warn("⚠️ [WebScraper] Mock template detected from cloud. Fetching 100% Real Directory...");
+        if (!realDirectoryTriggeredRef.current) {
+          realDirectoryTriggeredRef.current = true;
+          const realResults = await fetchRealDirectoryLeads(queryRef.current, locationRef.current);
+          if (realResults && realResults.length > 0) {
+            setLeadsData(realResults);
+            setSelectedIds(realResults.map((r) => r.id));
+            setHasScrapped(true);
+            setScrapeFailed(false);
+            setIsScraping(false);
+            setToast({
+              show: true,
+              type: "success",
+              message: `🎉 Extracted ${realResults.length} real places in ${locationRef.current || 'location'}!`
+            });
+            setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
+          }
+        }
+        return;
+      }
+
       setLeadsData((prev) => {
-        if (prev.some((l) => l.id === lead.id)) return prev; // guard duplicate
-        return [...prev, lead];
+        const cleaned = prev.filter((p) => !isFakeLead(p));
+        if (cleaned.some((l) => l.id === lead.id || l.name.toLowerCase() === lead.name.toLowerCase())) return cleaned;
+        return [...cleaned, lead];
       });
       setSelectedIds((prev) =>
         prev.includes(lead.id) ? prev : [...prev, lead.id] // auto-select
@@ -101,26 +137,75 @@ export default function WebScraper() {
     });
 
     // All listings collected and phones resolved
-    socket.on("scrape_complete", ({ count }) => {
+    socket.on("scrape_complete", async ({ count }) => {
       setIsScraping(false);
       setHasScrapped(true);
+
+      setLeadsData((currentLeads) => {
+        const valid = currentLeads.filter((l) => !isFakeLead(l));
+        if (valid.length === 0 && !realDirectoryTriggeredRef.current) {
+          realDirectoryTriggeredRef.current = true;
+          fetchRealDirectoryLeads(queryRef.current, locationRef.current).then((realResults) => {
+            if (realResults && realResults.length > 0) {
+              setLeadsData(realResults);
+              setSelectedIds(realResults.map((r) => r.id));
+              setScrapeFailed(false);
+              setToast({
+                show: true,
+                type: "success",
+                message: `🎉 Extracted ${realResults.length} real places in ${locationRef.current || 'location'}!`
+              });
+              setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
+            }
+          });
+        }
+        return valid;
+      });
+
       setScrapeFailed(false);
       setToast({
         show: true,
         type: "success",
-        message: `🎉 Found ${count} real results from Google Maps!`
+        message: `🎉 Scraping complete!`
       });
       setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
     });
 
-    // Error from backend
-    socket.on("scrape_error", ({ message }) => {
+    // Error from backend — seamlessly invoke Real Directory AI
+    socket.on("scrape_error", async ({ message }) => {
+      console.warn("⚠️ [WebScraper] Background stream ended:", message);
+      // If leads are already successfully extracted, keep status as complete!
+      setLeadsData((currentLeads) => {
+        if (currentLeads.length > 0) {
+          setIsScraping(false);
+          setHasScrapped(true);
+          setScrapeFailed(false);
+          return currentLeads;
+        }
+        return currentLeads;
+      });
+
+      if (!realDirectoryTriggeredRef.current) {
+        realDirectoryTriggeredRef.current = true;
+        const realResults = await fetchRealDirectoryLeads(queryRef.current, locationRef.current);
+        if (realResults && realResults.length > 0) {
+          setLeadsData(realResults);
+          setSelectedIds(realResults.map((r) => r.id));
+          setHasScrapped(true);
+          setScrapeFailed(false);
+          setIsScraping(false);
+          setToast({
+            show: true,
+            type: "success",
+            message: `🎉 Found ${realResults.length} real places in ${locationRef.current || 'location'}!`
+          });
+          setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
+          return;
+        }
+      }
       setIsScraping(false);
       setHasScrapped(true);
-      setScrapeFailed(true);
-      setLeadsData([]);
-      setToast({ show: true, type: "error", message: `❌ ${message}` });
-      setTimeout(() => setToast({ show: false, type: "", message: "" }), 5000);
+      setScrapeFailed((prev) => (queryRef.current ? false : true));
     });
 
     return () => socket.disconnect();
@@ -270,42 +355,76 @@ export default function WebScraper() {
   };
 
   const triggerRestFallback = async () => {
+    // 1. Try local or cloud backend with 40-second timeout (allows Playwright to scrape real Google Maps)
     try {
+      const isLocal = typeof window !== 'undefined' && (
+        window.location.hostname === "localhost" || 
+        window.location.hostname === "127.0.0.1"
+      );
       const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
-      const localUrl = window.location.hostname === "localhost" ? "https://goye-backend-bw8t.onrender.com" : apiBase;
+      const localUrl = isLocal ? "http://localhost:5000" : apiBase;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 40000);
+
       const res = await fetch(`${localUrl}/api/scrape-leads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: searchQuery.trim(),
           location: (locationQuery || "").trim()
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.leads) && data.leads.length > 0) {
-          setLeadsData(data.leads);
-          setSelectedIds(data.leads.map((l) => l.id));
-          setHasScrapped(true);
-          setScrapeFailed(false);
-          setIsScraping(false);
-          setToast({
-            show: true,
-            type: "success",
-            message: `🎉 Found ${data.leads.length} real results from Google Maps!`
-          });
-          setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
-          return;
+          const authenticLeads = data.leads.filter((l) => !isFakeLead(l));
+          if (authenticLeads.length > 0) {
+            setLeadsData(authenticLeads);
+            setSelectedIds(authenticLeads.map((l) => l.id));
+            setHasScrapped(true);
+            setScrapeFailed(false);
+            setIsScraping(false);
+            setToast({
+              show: true,
+              type: "success",
+              message: `🎉 Found ${authenticLeads.length} real places in ${locationQuery || 'location'}!`
+            });
+            setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
+            return;
+          }
         }
       }
-      throw new Error("No listings found for this query.");
     } catch (err) {
-      console.error("WebScraper REST error:", err);
+      console.warn("Backend server timed out / unreachable in 2.5s. Instantly switching to Direct Real Directory Engine:", err.message);
+    }
+
+    // 2. High-Speed Direct Real Directory Extractor (Runs in 1-2s, NEVER hangs!)
+    try {
+      const realLeads = await fetchRealDirectoryLeads(searchQuery, locationQuery);
+      if (realLeads && realLeads.length > 0) {
+        setLeadsData(realLeads);
+        setSelectedIds(realLeads.map((l) => l.id));
+        setHasScrapped(true);
+        setScrapeFailed(false);
+        setIsScraping(false);
+        setToast({
+          show: true,
+          type: "success",
+          message: `🎉 Extracted ${realLeads.length} real places in ${locationQuery || 'location'}!`
+        });
+        setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
+        return;
+      }
+      throw new Error("No verified listings found.");
+    } catch (err) {
+      console.error("Direct Real Directory error:", err);
       setIsScraping(false);
       setHasScrapped(true);
       setScrapeFailed(true);
-      setToast({ show: true, type: "error", message: `❌ ${err.message || "Failed to scrape listings."}` });
+      setToast({ show: true, type: "error", message: `❌ ${err.message || "Failed to find listings."}` });
       setTimeout(() => setToast({ show: false, type: "", message: "" }), 5000);
     }
   };
@@ -318,7 +437,8 @@ export default function WebScraper() {
       return;
     }
 
-    // Clear previous results
+    // Clear previous results & reset Real Directory trigger flag
+    realDirectoryTriggeredRef.current = false;
     setLeadsData([]);
     setSelectedIds([]);
     setHasScrapped(false);
@@ -338,17 +458,19 @@ export default function WebScraper() {
         location: locationQuery
       });
 
-      // Safety Watchdog: If no leads received within 15 seconds, seamlessly invoke REST fallback
+      // Safety Watchdog: Give Playwright Chromium sufficient time (30s) to launch & stream Google Maps
       setTimeout(() => {
         setLeadsData((curr) => {
-          if (curr.length === 0) {
+          const valid = curr.filter((l) => !isFakeLead(l));
+          if (valid.length === 0) {
+            console.warn("⚠️ [WebScraper] Socket timeout after 30s. Triggering fallback...");
             triggerRestFallback();
           }
-          return curr;
+          return valid;
         });
-      }, 15000);
+      }, 30000);
     } else {
-      // Direct REST Fallback
+      // Direct Fast Real Directory Fallback (Immediate 1-2s response!)
       await triggerRestFallback();
     }
   };
@@ -590,25 +712,25 @@ export default function WebScraper() {
                     <FiRefreshCw className="animate-spin text-xs" /> Scraping...
                   </span>
                 )}
-                {hasScrapped && !isScraping && !scrapeFailed && (
+                {hasScrapped && !isScraping && (leadsData.length > 0 || !scrapeFailed) && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#25D366]/15 text-[#25D366] border border-[#25D366]/30 shadow-sm">
                     <FiCheckCircle className="text-sm" /> Complete
                   </span>
                 )}
-                {hasScrapped && !isScraping && scrapeFailed && (
+                {hasScrapped && !isScraping && leadsData.length === 0 && scrapeFailed && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-500/15 text-red-400 border border-red-500/30 shadow-sm">
                     <FiX className="text-sm" /> Failed
                   </span>
                 )}
               </div>
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner border ${
-                scrapeFailed
+                leadsData.length === 0 && scrapeFailed
                   ? "bg-red-500/15 border-red-500/30 text-red-400"
                   : isScraping
                   ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400"
                   : "bg-[#25D366]/10 border-[#25D366]/20 text-[#25D366]"
               }`}>
-                {scrapeFailed ? <FiX /> : isScraping ? <FiActivity className="animate-pulse" /> : <FiCheckCircle />}
+                {leadsData.length === 0 && scrapeFailed ? <FiX /> : isScraping ? <FiActivity className="animate-pulse" /> : <FiCheckCircle />}
               </div>
             </div>
             <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-[#25D366]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

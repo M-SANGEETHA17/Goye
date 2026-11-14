@@ -78,10 +78,35 @@ router.get('/', async (req, res) => {
             }
         } catch (e) {}
 
-        const mapped = (requests || []).map(r => ({
-            ...r,
-            hasScreenshot: screenshotIdSet.has(String(r._id)) || !!r.hasScreenshot
-        }));
+        // Lookup phone number for each user from users or freeusers
+        const phoneMap = {};
+        try {
+            if (mongoose.connection.db && requests && requests.length > 0) {
+                const emails = requests.map(r => String(r.email || '').trim().toLowerCase()).filter(Boolean);
+                if (emails.length > 0) {
+                    const uList = await mongoose.connection.db.collection('users')
+                        .find({ email: { $in: emails } }, { projection: { email: 1, phone: 1 } })
+                        .toArray();
+                    uList.forEach(u => { if (u.email && u.phone) phoneMap[u.email.toLowerCase()] = u.phone; });
+
+                    const fList = await mongoose.connection.db.collection('freeusers')
+                        .find({ email: { $in: emails } }, { projection: { email: 1, phone: 1 } })
+                        .toArray();
+                    fList.forEach(f => { if (f.email && f.phone && !phoneMap[f.email.toLowerCase()]) phoneMap[f.email.toLowerCase()] = f.phone; });
+                }
+            }
+        } catch (phErr) {
+            console.error('Error attaching phone numbers:', phErr.message);
+        }
+
+        const mapped = (requests || []).map(r => {
+            const cleanEmail = String(r.email || '').trim().toLowerCase();
+            return {
+                ...r,
+                phone: r.phone || phoneMap[cleanEmail] || '',
+                hasScreenshot: screenshotIdSet.has(String(r._id)) || !!r.hasScreenshot
+            };
+        });
 
         return res.json({ success: true, requests: mapped });
     } catch (err) {

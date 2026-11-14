@@ -12,8 +12,8 @@ export default function Navbar() {
   const isJoinTeamPage = location.pathname.includes('/join-team') || location.pathname.includes('/join_team');
   const { notifications, unreadCount, markAsRead, credits: contextCredits } = useNotifications();
 
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isFreeUserLoggedIn, setIsFreeUserLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem("isLoggedIn") === "true");
+  const [isFreeUserLoggedIn, setIsFreeUserLoggedIn] = useState(() => localStorage.getItem("isLoggedIn") !== "true" && (!!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData")));
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeToast, setActiveToast] = useState(null);
@@ -325,20 +325,22 @@ export default function Navbar() {
         ? new Date(upcomingExp).getTime()
         : (expiresAt && expiresAt !== "null" ? new Date(expiresAt).getTime() : 0);
 
-      const isPaidActive = isSub && (expTime === 0 || expTime > Date.now());
+      const loggedIn = localStorage.getItem("isLoggedIn") === "true";
+      const freeLoggedIn = !loggedIn && (!!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData"));
 
-      if (isPaidActive) {
+      if (loggedIn) {
         if (localStorage.getItem("freeUserToken") || localStorage.getItem("freeUserData")) {
           localStorage.removeItem("freeUserToken");
           localStorage.removeItem("freeUserData");
         }
         setIsLoggedIn(true);
         setIsFreeUserLoggedIn(false);
+      } else if (freeLoggedIn) {
+        setIsLoggedIn(false);
+        setIsFreeUserLoggedIn(true);
       } else {
-        const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-        const freeLoggedIn = !!localStorage.getItem("freeUserToken");
-        setIsLoggedIn(loggedIn);
-        setIsFreeUserLoggedIn(freeLoggedIn);
+        setIsLoggedIn(false);
+        setIsFreeUserLoggedIn(false);
       }
       const stored = localStorage.getItem("credits");
       setNavCredits(stored !== null ? Math.max(0, parseInt(stored, 10)) : 0);
@@ -453,9 +455,9 @@ export default function Navbar() {
     setMobileOpen(false);
 
     if (location.pathname.includes("admin")) {
-      navigate("/goye-admin-login");
+      window.location.href = "/goye-admin-login";
     } else {
-      navigate("/userloginpage");
+      window.location.href = "/userloginpage";
     }
   };
 
@@ -608,10 +610,14 @@ export default function Navbar() {
   };
 
   const isAdminPage = location.pathname.includes("admin");
+  const isLoginPage = location.pathname.includes("login") || location.pathname.includes("register");
 
-  const isAnyUserLoggedIn = isLoggedIn || isFreeUserLoggedIn;
+  const effectiveIsLoggedIn = !isLoginPage && isLoggedIn;
+  const effectiveIsFreeUserLoggedIn = !isLoginPage && isFreeUserLoggedIn;
+  const isAnyUserLoggedIn = effectiveIsLoggedIn || effectiveIsFreeUserLoggedIn;
   
   const isSubscriptionActive = () => {
+    if (!effectiveIsLoggedIn) return false;
     const isSub = localStorage.getItem("isSubscribed") === "true";
     const expiresAt = localStorage.getItem("subscriptionExpiresAt");
     const upcomingExp = localStorage.getItem("upcomingPlanExpiresAt");
@@ -642,7 +648,7 @@ export default function Navbar() {
   const isFeatureRestricted = isLocked;
   const isMessagesLocked = isLocked;
 
-  const isFreeUserAccount = !!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData");
+  const isFreeUserAccount = !isLoginPage && (!!localStorage.getItem("freeUserToken") || !!localStorage.getItem("freeUserData"));
   const showFreeUserToast = isFreeUserAccount && !isSubscribedUser && !dismissedFreeUserToast;
 
   const handleAboutUsClick = () => {
@@ -666,11 +672,11 @@ export default function Navbar() {
   };
 
   // Strictly for logged-in Subscription users (Free-trial users remain completely untouched)
-  const isSubscriptionUserLoggedIn = isLoggedIn && !isFreeUserLoggedIn;
+  const isSubscriptionUserLoggedIn = effectiveIsLoggedIn && !effectiveIsFreeUserLoggedIn;
 
   const userNavLinks = isSubscriptionUserLoggedIn
     ? [
-        ...(isAnyUserLoggedIn ? [{ label: "Messages", href: "/", isMessages: true }] : []),
+        { label: "Messages", href: "/", isMessages: true },
         { label: "Web Scraper", href: "/web-scraper" },
         { label: "Group Scraper", href: "/group-management" },
         { label: "Social Leads", href: "/social-extractor" },
@@ -678,11 +684,9 @@ export default function Navbar() {
         { label: "Contact", href: "/contact" },
       ]
     : [
-        ...(!isAnyUserLoggedIn ? [{ label: "Home", href: "/", isHome: true }] : []),
-        ...(isAnyUserLoggedIn ? [{ label: "Messages", href: "/", isMessages: true, isRestricted: isMessagesLocked }] : []),
-        ...(!isAnyUserLoggedIn ? [{ label: "About", href: "/about" }] : []),
+        { label: "Home", href: "/", isHome: true },
+        { label: "About", href: "/about" },
         { label: "Subscriptions", href: "/subscriptions" },
-        ...(isFreeUserLoggedIn ? [{ label: "Subscription Features", isFeaturesDropdown: true }] : []),
         { label: "Contact", href: "/contact" },
       ];
 
@@ -1176,7 +1180,7 @@ export default function Navbar() {
             <div className={`hidden md:flex items-center gap-2.5 ${
               isJoinTeamPage ? "pointer-events-none opacity-40 cursor-not-allowed select-none" : ""
             }`}>
-              {!isAdminPage && !isWhatsappConnected && (
+              {!isAdminPage && !isLoginPage && !isWhatsappConnected && (
                 <button
                   onClick={handleConnect}
                   className="shrink-0 px-4 py-1.5 rounded-full font-semibold text-xs sm:text-sm text-white transition-all duration-300 hover:scale-105 active:scale-95 shadow-md hover:shadow-[0_10px_24px_rgba(52,227,138,0.4)]"
@@ -1189,7 +1193,7 @@ export default function Navbar() {
                 </button>
               )}
 
-              {isLoggedIn ? (
+              {effectiveIsLoggedIn ? (
                 <>
                   {!isAdminPage && (
                     <>
@@ -1700,7 +1704,7 @@ export default function Navbar() {
                 </button>
               )}
 
-              {isLoggedIn ? (
+              {effectiveIsLoggedIn ? (
                 <div className="flex flex-col gap-3">
                   {!isAdminPage && (
                     <>

@@ -22,6 +22,7 @@ import {
 } from "react-icons/fa";
 import { FiLayers, FiRefreshCw, FiCopy } from "react-icons/fi";
 import * as XLSX from "xlsx";
+import { isFakeLead, fetchRealDirectoryLeads } from "../utils/realLeadDirectory";
 
 export default function SocialExtractor() {
   const navigate = useNavigate();
@@ -101,8 +102,12 @@ export default function SocialExtractor() {
 
   // Connect Socket.IO once on mount
   useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && (
+      window.location.hostname === "localhost" || 
+      window.location.hostname === "127.0.0.1"
+    );
     const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
-    const socketUrl = window.location.hostname === "localhost" ? "https://goye-backend-bw8t.onrender.com" : apiBase;
+    const socketUrl = isLocal ? "http://localhost:5000" : apiBase;
 
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"],
@@ -112,6 +117,7 @@ export default function SocialExtractor() {
 
     // A new listing arrived in terminal — append immediately to table!
     socket.on("scrape_lead", (item) => {
+      if (isFakeLead(item)) return; // Strictly ignore any legacy mock template items
       const activePlats = activePlatsRef.current.length > 0 ? activePlatsRef.current : ["instagram", "youtube", "facebook"];
       const plat = activePlats[leadIndexRef.current % activePlats.length];
       leadIndexRef.current += 1;
@@ -331,8 +337,12 @@ export default function SocialExtractor() {
     } else {
       // Fallback to REST API if socket not available
       try {
+        const isLocal = typeof window !== 'undefined' && (
+          window.location.hostname === "localhost" || 
+          window.location.hostname === "127.0.0.1"
+        );
         const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
-        const localUrl = window.location.hostname === "localhost" ? "https://goye-backend-bw8t.onrender.com" : apiBase;
+        const localUrl = isLocal ? "http://localhost:5000" : apiBase;
         const scrapeRes = await fetch(`${localUrl}/api/scrape-leads`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -346,7 +356,8 @@ export default function SocialExtractor() {
           const scrapeData = await scrapeRes.json();
           if (scrapeData && Array.isArray(scrapeData.leads) && scrapeData.leads.length > 0) {
             const cleanLoc = location.split(",")[0].trim();
-            const fetchedLeads = scrapeData.leads.map((item, idx) => {
+            const validLeads = scrapeData.leads.filter((item) => !isFakeLead(item));
+            const fetchedLeads = (validLeads.length > 0 ? validLeads : await fetchRealDirectoryLeads(niche, location)).map((item, idx) => {
               const plat = activePlats[idx % activePlats.length];
               const bizName = (item.name || "").trim();
               const cleanSlug = bizName.toLowerCase().replace(/[^a-z0-9]/g, "");

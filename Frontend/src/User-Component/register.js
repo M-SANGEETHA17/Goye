@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEye, FaEyeSlash, FaUser, FaEnvelope, FaLock, FaTimes, FaArrowRight, FaPhone, FaMapMarkerAlt, FaBuilding, FaBriefcase } from "react-icons/fa";
+import API_BASE_URL from "../config";
 
 const BUBBLE_PATTERN = `<svg xmlns='http://www.w3.org/2000/svg' width='84' height='84'><path d='M16 12h34a7 7 0 017 7v16a7 7 0 01-7 7H30l-9 8v-8h-5a7 7 0 01-7-7V19a7 7 0 017-7z' fill='none' stroke='#25D366' stroke-opacity='0.06' stroke-width='1.4'/></svg>`;
 const BUBBLE_BG = `data:image/svg+xml,${encodeURIComponent(BUBBLE_PATTERN)}`;
@@ -60,6 +61,8 @@ export default function Register() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Ultra-fast backend pre-warming
+    fetch(`${API_BASE_URL}/api/health`).catch(() => {});
     const timer = setTimeout(() => setShow(true), 50);
     return () => clearTimeout(timer);
   }, []);
@@ -96,7 +99,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const apiBaseUrl = (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com").replace(/\/+$/, "");
+      const apiBaseUrl = API_BASE_URL;
       const fullPhone = formData.phone.trim().startsWith("+") ? formData.phone.trim() : `${countryCode} ${formData.phone.trim()}`;
       const response = await fetch(`${apiBaseUrl}/api/register`, {
         method: "POST",
