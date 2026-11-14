@@ -335,9 +335,25 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
       console.log(`📊 Total listings so far: ${seenNames.size} — scrolling...`);
       await page.evaluate(() => {
         const feed = document.querySelector('div[role="feed"]');
-        if (feed) feed.scrollBy(0, 1500);
+        if (feed) {
+          feed.scrollBy(0, 2000);
+          const cards = feed.querySelectorAll('div[role="article"], div.Nv2PK, a[href*="/maps/place/"]');
+          if (cards.length > 0) {
+            cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }
+        }
       });
-      await page.waitForTimeout(1500);
+      try {
+        const feedEl = await page.$('div[role="feed"]');
+        if (feedEl) {
+          const bb = await feedEl.boundingBox();
+          if (bb) {
+            await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+            await page.mouse.wheel(0, 2000);
+          }
+        }
+      } catch (_) {}
+      await page.waitForTimeout(1600);
     }
 
     // Signal phone worker that scrolling is done, then await it
