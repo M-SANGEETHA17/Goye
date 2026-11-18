@@ -1010,10 +1010,10 @@ export default function AdminUsers() {
                 <div className="bg-emerald-50 border-emerald-200 text-emerald-800 -m-3.5 p-3.5 rounded-2xl">
                   <p className="font-bold flex items-center gap-1.5 text-emerald-900">
                     <Sparkles size={14} className="text-emerald-600 shrink-0" />
-                    Immediate Activation
+                    Immediate Plan Activation
                   </p>
                   <p className="mt-1 text-emerald-700 text-[11px]">
-                    This user has no active plan. The new <strong>{selectedPlan}</strong> plan will activate immediately today with 99,999 credits and full subscribed features.
+                    This user's account is currently inactive. Confirming will instantly reactivate their subscription with the selected <strong>{selectedPlan}</strong>, effective immediately from today with full access.
                   </p>
                 </div>
               )}
