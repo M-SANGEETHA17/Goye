@@ -967,7 +967,7 @@ export default function AdminUsers() {
               {planModalUser.upcomingPlan && (
                 <div className="mt-2 pt-2 border-t border-emerald-200/60 flex items-center justify-between text-xs">
                   <span className="text-slate-500 flex items-center gap-1">
-                    <Clock size={12} className="text-blue-500" /> Queued Next:
+                    <Clock size={12} className="text-blue-500" /> Next Extension Scheduled:
                   </span>
                   <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                     {planModalUser.upcomingPlan}
@@ -999,11 +999,11 @@ export default function AdminUsers() {
               {planModalUser.isSubscribed && planModalUser.subscriptionExpiresAt && new Date(planModalUser.subscriptionExpiresAt).getTime() > Date.now() ? (
                 <div className="bg-blue-50 border-blue-200 text-blue-800 -m-3.5 p-3.5 rounded-2xl">
                   <p className="font-bold flex items-center gap-1.5 text-blue-900">
-                    <Clock size={14} className="text-blue-600 shrink-0" />
-                    Automatic Queueing Enabled
+                    <ShieldCheck size={14} className="text-blue-600 shrink-0" />
+                    Manual Subscription Extension
                   </p>
                   <p className="mt-1 text-blue-700 text-[11px]">
-                    This user currently has an active plan. The new <strong>{selectedPlan}</strong> plan will be placed in their queue and will activate automatically when the current plan expires.
+                    This user already has an active plan. Confirming will add <strong>{selectedPlan}</strong> of additional validity to their account, extending their subscription smoothly without losing remaining days.
                   </p>
                 </div>
               ) : (
