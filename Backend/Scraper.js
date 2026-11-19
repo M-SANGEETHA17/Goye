@@ -243,7 +243,7 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
 
     // ── Concurrent phone extraction worker ──────────────────────────────────
     // Runs in background while scrolling continues; 2 tabs at a time for stable cloud hosting memory.
-    const PHONE_CONCURRENCY = 4;
+    const PHONE_CONCURRENCY = 2;
     const phoneWorkerPromise = (async () => {
       while (!scrollingDone || phoneQueue.length > 0) {
         if (typeof isStopped === "function" && isStopped()) break;
@@ -385,6 +385,12 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
     console.error("❌ [Scraper Error]:", error.message);
     if (browser) {
       try { await browser.close(); } catch (_) {}
+    }
+    const realLeads = allLeads.filter((l) => l.name && l.name.length > 2);
+    if (realLeads.length > 0) {
+      console.log(`✅ [Scraper] Preserving ${realLeads.length} listings extracted from Google Maps before error.`);
+      if (isProgressive && onComplete) onComplete(realLeads);
+      return realLeads;
     }
     console.log("⚡ [Scraper] Activating resilient cloud fallback extractor...");
     return await fallbackScrapeLeads(searchQuery, locationQuery, callbacks);
@@ -661,215 +667,6 @@ Output ONLY valid JSON.`;
       for (const item of curatedList) {
         leads.push({ ...item });
       }
-    } else {
-      // Category-Aware Procedural Generator
-      const stdCode = "04" + (10 + (locationQuery ? locationQuery.length * 3 : 21));
-      let placeTemplates = [];
-
-      if (isGym) {
-        placeTemplates = [
-          "PowerFit Gym & Fitness Studio",
-          "Iron Core Fitness Center",
-          "Muscle Tech Gym & Health Club",
-          "Royal Fitness Club & Gym",
-          "FitLife Unisex Fitness Studio",
-          "Classic Gym & Crossfit Center",
-          "Spartan Fitness & Gym",
-          "Gold's Fitness Gym",
-          "Champion Health Club & Gym",
-          "Titan Fitness Studio",
-          "Alpha Gym & CrossFit",
-          "Bodyline Fitness Center",
-          "ProFit Unisex Gym",
-          "V-Fitness Studio",
-          "Evolution Gym & Wellness",
-          "Maximus Fitness Center",
-          "Pulse Gym & Fitness",
-          "Steel Body Gym",
-          "Optimum Health & Gym",
-          "Velocity Fitness Arena"
-        ];
-      } else if (isBakery) {
-        placeTemplates = [
-          "Iyengar Bakery & Sweets",
-          "Sri Krishna Sweets & Bakery",
-          "Crown Bakery & Cake Shop",
-          "Daily Fresh Bakery & Confectionery",
-          "Winner Bakery",
-          "Cake Point & Bakery",
-          "Hot Breads & Cafe",
-          "Royal Bakery & Sweets",
-          "Sri Murugan Bakery",
-          "Golden Bakery & Snacks",
-          "Bread Basket Bakery",
-          "Bake World Cake Shop",
-          "Cream & Fudge Bakery",
-          "Sweet Treats & Bakery",
-          "Cakes & Bakes Studio",
-          "Sri Lakshmi Sweets & Bakery",
-          "Classic Bakeries & Confectionery",
-          "Delight Cake & Bakery",
-          "Modern Bakery & Sweets",
-          "Anand Bakery & Tea Stall",
-          "Baker's Pride & Confectionery",
-          "Fresh Oven Bakery",
-          "Paris Bakery & Sweets",
-          "Sri Balaji Sweets & Bakery",
-          "Cake Zone Pastry Shop"
-        ];
-      } else if (isBoutique) {
-        placeTemplates = [
-          "Sri Lakshmi Designer Boutique",
-          "Trendz Ladies Boutique & Tailoring",
-          "Meena Fashion Boutique",
-          "Sri Ganesh Silks & Boutique",
-          "Style Icon Fashion Studio",
-          "Kavitha Designer Studio & Tailors",
-          "Elegance Women's Boutique",
-          "Mahaveer Textiles & Boutique",
-          "Ananya Bridal Boutique",
-          "Royal Heritage Silk & Boutique",
-          "Samyuktha Boutique & Couture",
-          "Pragathi Designer Lounge",
-          "Classic Cut Boutique & Tailoring",
-          "Shree Fashion & Bridal Boutique",
-          "Radha Silk House & Boutique",
-          "Divya Fashion Hub",
-          "Velan Silks & Sarees",
-          "Srinidhi Boutique & Stitching Center",
-          "Lotus Women's Boutique",
-          "Parijatham Designer Store",
-          "Nandhini Fashion Boutique",
-          "Colors Designer Studio",
-          "Sri Amman Boutique & Matching Center",
-          "Glamour Women's Wear & Boutique",
-          "Kanmani Aari Works & Boutique"
-        ];
-      } else if (isSupermarket) {
-        placeTemplates = [
-          "Nilgiris Supermarket",
-          "Reliance Smart Superstore",
-          "More Supermarket",
-          "Sri Murugan Supermarket",
-          "Ponmani Supermarket & Departmental Store",
-          "Daily Fresh Mart",
-          "Kannan Jubilee Supermarket",
-          "Subhiksha Departmental Stores",
-          "City Supermarket",
-          "Sri Balaji Provision & Supermarket",
-          "Metro Super Bazaar",
-          "Green Mart Supermarket",
-          "Family Supermarket & Grocery",
-          "Star Bazaar & Mart",
-          "Sri Lakshmi Departmental Store",
-          "Prime Supermarket",
-          "Heritage Daily Fresh Supermarket",
-          "Grand Mart Supermarket",
-          "Town Supermarket & Provisions",
-          "Choice Supermarket",
-          "Amman Supermarket",
-          "Fresh Basket Grocery Mart",
-          "National Supermarket",
-          "Smart Value Departmental Store",
-          "Supreme Supermarket"
-        ];
-      } else if (isCafe) {
-        placeTemplates = [
-          "Kumbakonam Degree Coffee",
-          "Sri Saravana Bhavan Hotel & Cafe",
-          "Madras Coffee House",
-          "Sri Aaryas Restaurant & Coffee Bar",
-          "Aavin Parlour & Cafe",
-          "Cafe Coffee Break",
-          "Tea Time & Snacks Bar",
-          "Hotel Anandha Bhavan",
-          "Anjappar Chettinad Restaurant",
-          "Mani's Cafe & Tiffin Center",
-          "Green Leaf Vegetarian Cafe",
-          "The Brew Room Cafe",
-          "Sree Krishna Bhavan",
-          "Chai Galli & Snacks",
-          "City Corner Coffee & Tea",
-          "Royal Cafe & Bakery",
-          "Madurai Famous Jigarthanda & Cafe",
-          "Hotel Gowri Krishna",
-          "Filter Coffee Express",
-          "Classic Tea & Tiffin House",
-          "Sri Balaji Bhavan & Cafe",
-          "Udupi Tiffin Center & Coffee",
-          "Cafe Mocha Express",
-          "Relax Tea Stall & Snacks",
-          "Aroma Coffee Lounge"
-        ];
-      } else if (isSchool) {
-        placeTemplates = [
-          "St. Joseph's Higher Secondary School",
-          "Government Boys Higher Secondary School",
-          "Government Girls Higher Secondary School",
-          "Sri Ramakrishna Vidyalaya Matriculation School",
-          "Holy Angels Senior Secondary School",
-          "Vivekananda Vidyalaya Matriculation School",
-          "Little Flower Higher Secondary School",
-          "Bharathiar Matriculation School",
-          "Kendriya Vidyalaya",
-          "Seventh Day Adventist School",
-          "Kamaraj Matriculation Higher Secondary School",
-          "Oxford Matriculation School",
-          "Annai Velankanni Matriculation Hr Sec School",
-          "Srinivasa Vidyalaya Matriculation School",
-          "St. Mary's Convent School",
-          "Green Park International CBSE School",
-          "National Model Senior Secondary School",
-          "Sri Chaitanya Techno School",
-          "Narayana Olympiad School",
-          "Don Bosco Higher Secondary School",
-          "Mount Litera Zee School",
-          "Maharishi Vidya Mandir",
-          "Sri Sankara Senior Secondary School",
-          "St. John's Matriculation School",
-          "AVM Matriculation Higher Secondary School",
-          "Adarsh Vidya Kendra",
-          "Carmel Girls Higher Secondary School",
-          "St. Paul's Higher Secondary School",
-          "Pioneer Public School CBSE",
-          "Vidyasagar International School",
-          "Tagore Matriculation Higher Secondary School",
-          "Sarojini Naidu Girls School",
-          "Bharathiar Vidyalaya Matric School",
-          "Amrita Vidyalayam",
-          "Al-Ameen Higher Secondary School",
-          "CSI Boys Higher Secondary School",
-          "CSI Girls Higher Secondary School",
-          "Municipal Primary & Middle School",
-          "Panchayat Union Primary School",
-          "Kurinji Matriculation School"
-        ];
-      } else {
-        const catClean = (searchQuery || "Business").trim();
-        const catWords = catClean.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-        placeTemplates = [
-          `Premier ${catWords}`,
-          `Sri Murugan ${catWords}`,
-          `Classic ${catWords} Studio`,
-          `Royal ${catWords}`,
-          `Apex ${catWords} Center`,
-          `Sri Lakshmi ${catWords}`,
-          `Universal ${catWords}`,
-          `City ${catWords} Works`,
-          `Grand ${catWords}`,
-          `Star ${catWords}`
-        ];
-      }
-
-      placeTemplates.forEach((pName, pIdx) => {
-        leads.push({
-          name: `${pName}, ${locationQuery || 'Tamil Nadu'}`,
-          phone: `+91 ${stdCode} ${240000 + pIdx * 137}`,
-          address: `Main Road, ${locationQuery || 'Tamil Nadu'}`,
-          rating: (4.3 + (pIdx % 5) * 0.1).toFixed(1),
-          website: null
-        });
-      });
     }
   }
 
