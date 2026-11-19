@@ -1412,11 +1412,13 @@ io.on("connection", (socket) => {
         console.log(`🕷️ [WebScraper] Starting scrape for query: "${query}", location: "${location || ""}"`);
 
         let completed = false;
+        let leadsSent = 0;
         try {
             await scrapeGoogleMapsLeads(query, location, {
                 isPaused: () => !!(socket.scrapeState && socket.scrapeState.isPaused),
                 isStopped: () => !!(socket.scrapeState && socket.scrapeState.isStopped),
                 onLead: (lead) => {
+                    leadsSent++;
                     socket.emit("scrape_lead", lead);
 
                     // Background official social extractor from website
@@ -1444,7 +1446,12 @@ io.on("connection", (socket) => {
             });
         } catch (err) {
             console.error("❌ Web Scraper error:", err);
-            if (!completed) {
+            if (leadsSent > 0) {
+                if (!completed) {
+                    completed = true;
+                    socket.emit("scrape_complete", { count: leadsSent });
+                }
+            } else if (!completed) {
                 socket.emit("scrape_error", { message: err.message || "Failed to scrape listings." });
             }
         }
