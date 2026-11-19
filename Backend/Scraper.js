@@ -226,11 +226,29 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
 
     console.log("⏳ Waiting for Google Maps results to load...");
     try {
-      await page.waitForSelector('div[role="feed"]', { timeout: 20000 });
+      await page.waitForSelector('div[role="feed"], div[role="article"], div.Nv2PK, div[aria-label*="Results for"], a[href*="/maps/place/"]', { timeout: 4000 });
     } catch (_) {
-      console.warn("⚠️ Feed not found after 20s");
+      console.warn("⚠️ Dedicated feed container not found within 4s, scanning page directly...");
     }
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(600);
+
+    // Immediate First-Pass Stream: Emit cards as soon as the page is visible!
+    const firstBatch = await extractNewListings(page, []);
+    for (const listing of firstBatch) {
+      listing.id = idCounter++;
+      seenNames.add(listing.name.toLowerCase());
+      allLeads.push(listing);
+      const { _listingUrl, ...leadToSend } = listing;
+      if (isProgressive) onLead(leadToSend);
+      if (!listing.phone && listing._listingUrl) {
+        phoneQueue.push(listing);
+      } else {
+        delete listing._listingUrl;
+      }
+    }
+    if (firstBatch.length > 0) {
+      console.log(`⚡ [Fast First Pass] Emitted ${firstBatch.length} listings immediately to socket!`);
+    }
 
     // ── State tracking ──────────────────────────────────────────────────────
     const seenNames = new Set();
@@ -580,8 +598,8 @@ Output ONLY valid JSON.`;
     }
   }
 
-  // 3. Absolute Safety Layer: If external APIs failed or returned 0, load verified directory
-  if (leads.length === 0) {
+  // 3. Absolute Safety Layer: Ensure at least 15 verified real places for the requested town
+  if (leads.length < 15) {
     console.log(`🛡️ [Backend Fallback] Loading verified directory institutions for "${searchQuery}" in "${locationQuery}"...`);
     const locKey = (locationQuery || "").toLowerCase().replace(/[^a-z]/g, "");
     const BACKEND_VERIFIED = {
@@ -681,7 +699,9 @@ Output ONLY valid JSON.`;
     const curatedList = BACKEND_VERIFIED[locKey];
     if (curatedList && curatedList.length > 0) {
       for (const item of curatedList) {
-        leads.push({ ...item });
+        if (!leads.some(l => l.name.toLowerCase() === item.name.toLowerCase())) {
+          leads.push({ ...item });
+        }
       }
     }
   }
