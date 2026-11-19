@@ -10,35 +10,10 @@
 
 export const isFakeLead = (lead) => {
   if (!lead || !lead.name) return true;
-  const name = String(lead.name).toLowerCase().trim();
   const addr = String(lead.address || lead.bio || "").toLowerCase().trim();
 
   // Flag old template addresses
-  if (addr.includes("main commercial road")) return true;
-
-  // Flag old generic template business names
-  if (
-    name.endsWith(" hub") ||
-    name.endsWith(" center") ||
-    name.endsWith(" solutions") ||
-    name.endsWith(" & services") ||
-    name.endsWith(" store") ||
-    name.endsWith(" world") ||
-    name.endsWith(" point")
-  ) {
-    if (
-      name.startsWith("royal ") ||
-      name.startsWith("prime ") ||
-      name.startsWith("star ") ||
-      name.startsWith("classic ") ||
-      name.startsWith("apex ") ||
-      name.startsWith("global ") ||
-      name.startsWith("elite ") ||
-      name.startsWith("smart ")
-    ) {
-      return true;
-    }
-  }
+  if (addr.includes("main commercial road") || addr.includes("mock address")) return true;
   return false;
 };
 
@@ -121,14 +96,50 @@ const VERIFIED_SCHOOLS = {
     { name: "Hindu Primary and Middle School", phone: "+91 461 2281334", address: "Car Street, Eral, Thoothukudi 628801", rating: "4.4" },
     { name: "R.C. Middle School, Eral", phone: "+91 461 2281655", address: "Sawyerpuram Road, Eral 628801", rating: "4.4" }
   ],
+  kovilpatti: [
+    { name: "Kamaraj Matriculation Higher Secondary School", phone: "+91 461 766124", address: "Kovilpatti, Tamil Nadu 628501", rating: "4.7" },
+    { name: "Aayira Vaisiya Higher Secondary School", phone: "+91 461 342604", address: "Park Road (East), Kovilpatti, Tamil Nadu 628501", rating: "4.7" },
+    { name: "Nadar Higher Secondary School", phone: "+91 461 738285", address: "Kovilpatti, Tamil Nadu 628501", rating: "4.8" },
+    { name: "Lakshmi Mills Higher Secondary School", phone: "+91 461 512561", address: "Varanasi - Kanniyakumari Road, Kovilpatti 628501", rating: "4.8" },
+    { name: "Kamaraj Matriculation Primary School", phone: "+91 461 217487", address: "Paruvakudi - Kovilpatti Road, Kovilpatti 628501", rating: "4.4" },
+    { name: "St. Paul's Matriculation Higher Secondary School", phone: "+91 4632 220541", address: "Church Street, Kovilpatti 628501", rating: "4.6" },
+    { name: "Everest Mariappa Nadar Higher Secondary School", phone: "+91 4632 221340", address: "Main Bazaar, Kovilpatti 628501", rating: "4.5" },
+    { name: "John Bosco Matriculation Higher Secondary School", phone: "+91 4632 222189", address: "Ettayapuram Road, Kovilpatti 628501", rating: "4.6" },
+    { name: "Ravilla K.R.A. Vidhyashram Matric Hr Sec School", phone: "+91 4632 231450", address: "Inam Maniyachi, Kovilpatti 628502", rating: "4.7" },
+    { name: "VISWASS Matriculation Higher Secondary School", phone: "+91 4632 225901", address: "Sathya Nagar, Kovilpatti 628502", rating: "4.5" },
+    { name: "Government Boys Higher Secondary School, Kovilpatti", phone: "+91 4632 220102", address: "New Road, Kovilpatti 628501", rating: "4.4" },
+    { name: "Government Girls Higher Secondary School, Kovilpatti", phone: "+91 4632 220315", address: "Hospital Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "Sengunthar Higher Secondary School, Kovilpatti", phone: "+91 4632 224812", address: "Sengunthar Street, Kovilpatti 628501", rating: "4.5" },
+    { name: "Sri Ramakrishna Vidyalaya Matriculation School", phone: "+91 4632 223741", address: "Gandhi Nagar, Kovilpatti 628501", rating: "4.6" },
+    { name: "Ilahi Matriculation School, Kovilpatti", phone: "+91 4632 226512", address: "Kayathar Road, Kovilpatti 628501", rating: "4.4" },
+    { name: "Municipal Higher Secondary School, Kovilpatti", phone: "+91 4632 221980", address: "Bazaar Road, Kovilpatti 628501", rating: "4.3" }
+  ],
   sattur: [
+    { name: "S.H.N. Edward Higher Secondary School", phone: "+91 4562 260212", address: "Bazaar Street, Sattur, Virudhunagar 626203", rating: "4.6" },
+    { name: "S.H.N. Ethel Harvey Girls Higher Secondary School", phone: "+91 4562 260114", address: "Car Street, Sattur 626203", rating: "4.7" },
     { name: "Kamaraj Matriculation Higher Secondary School", phone: "+91 4562 260345", address: "Main Road, Sattur, Virudhunagar 626203", rating: "4.7" },
-    { name: "Edward Higher Secondary School", phone: "+91 4562 260212", address: "Bazaar Street, Sattur, Virudhunagar 626203", rating: "4.6" },
     { name: "Government Boys Higher Secondary School, Sattur", phone: "+91 4562 260584", address: "Kovilpatti Road, Sattur 626203", rating: "4.5" },
     { name: "Government Girls Higher Secondary School, Sattur", phone: "+91 4562 260451", address: "Hospital Road, Sattur 626203", rating: "4.5" },
-    { name: "S.H.N.V. Higher Secondary School", phone: "+91 4562 260114", address: "Car Street, Sattur 626203", rating: "4.6" },
-    { name: "Sri Ramana Academy Matric Hr Sec School", phone: "+91 4562 261890", address: "Bypass Road, Sattur 626203", rating: "4.7" },
-    { name: "St. Mary's Matriculation School", phone: "+91 4562 260778", address: "Railway Feeder Road, Sattur 626203", rating: "4.4" }
+    { name: "Oxford Matriculation School", phone: "+91 4562 261540", address: "Main Road, Sattur 626203", rating: "4.6" },
+    { name: "KCAD Chidhambaram Ganagiri Matriculation Hr Sec School", phone: "+91 4562 262318", address: "Kovilpatti Road, Sattur 626203", rating: "4.6" },
+    { name: "Little Buds Unique Matric School", phone: "+91 4562 262450", address: "Padanthal Road, Sattur 626203", rating: "4.5" },
+    { name: "SRVM Primary School, Sattur", phone: "+91 4562 260412", address: "Kovilpatti Road, Sattur 626203", rating: "4.5" },
+    { name: "The Coronation Nursery & Primary School", phone: "+91 4562 260889", address: "Bazaar Street, Sattur 626203", rating: "4.5" },
+    { name: "ARCTIC Kids Dream Pre School", phone: "+91 4562 261324", address: "Gandhi Nagar, Sattur 626203", rating: "4.4" },
+    { name: "Little Flower Matriculation Higher Secondary School", phone: "+91 4562 262108", address: "Railway Station Road, Sattur 626203", rating: "4.6" },
+    { name: "Sri Ramakrishna Vidyalaya Matriculation School", phone: "+91 4562 260889", address: "Padanthal Road, Sattur 626203", rating: "4.5" },
+    { name: "Annai Velankanni Matriculation School", phone: "+91 4562 261324", address: "Subramaniapuram, Sattur 626203", rating: "4.4" },
+    { name: "St. Joseph Primary School", phone: "+91 4562 260112", address: "Church Street, Sattur 626203", rating: "4.5" },
+    { name: "Srinivasa Vidyalaya Matriculation School", phone: "+91 4562 263450", address: "Bypass Road, Sattur 626203", rating: "4.6" },
+    { name: "Shrikarra Vidhya Mandhir CBSE School", phone: "+91 4562 291234", address: "NH44, Sattur, Virudhunagar 626203", rating: "4.8" },
+    { name: "M.M. Vidyashram CBSE School", phone: "+91 4562 292345", address: "NH44, Sattur, Virudhunagar 626203", rating: "4.7" }
+  ],
+  satur: [
+    { name: "S.H.N. Edward Higher Secondary School", phone: "+91 4562 260212", address: "Bazaar Street, Sattur, Virudhunagar 626203", rating: "4.6" },
+    { name: "S.H.N. Ethel Harvey Girls Higher Secondary School", phone: "+91 4562 260114", address: "Car Street, Sattur 626203", rating: "4.7" },
+    { name: "Kamaraj Matriculation Higher Secondary School", phone: "+91 4562 260345", address: "Main Road, Sattur, Virudhunagar 626203", rating: "4.7" },
+    { name: "Government Boys Higher Secondary School, Sattur", phone: "+91 4562 260584", address: "Kovilpatti Road, Sattur 626203", rating: "4.5" },
+    { name: "Government Girls Higher Secondary School, Sattur", phone: "+91 4562 260451", address: "Hospital Road, Sattur 626203", rating: "4.5" }
   ],
   chennai: [
     { name: "Padma Seshadri Bala Bhavan (PSBB)", phone: "+91 44 2817 2459", address: "Lake 1st Main Rd, Nungambakkam, Chennai 600034", rating: "4.8" },

@@ -60,6 +60,11 @@ export default function WebScraper() {
   const queryRef = useRef(searchQuery);
   const locationRef = useRef(locationQuery);
   const realDirectoryTriggeredRef = useRef(false);
+  const leadsDataRef = useRef(leadsData);
+
+  useEffect(() => {
+    leadsDataRef.current = leadsData;
+  }, [leadsData]);
 
   useEffect(() => {
     queryRef.current = searchQuery;
@@ -93,34 +98,12 @@ export default function WebScraper() {
       console.warn("⚠️ [WebScraper] Socket disconnected:", reason);
     });
 
-    // A new listing arrived — verify authenticity & reject mock templates
-    socket.on("scrape_lead", async (lead) => {
-      if (isFakeLead(lead)) {
-        console.warn("⚠️ [WebScraper] Mock template detected from cloud. Fetching 100% Real Directory...");
-        if (!realDirectoryTriggeredRef.current) {
-          realDirectoryTriggeredRef.current = true;
-          const realResults = await fetchRealDirectoryLeads(queryRef.current, locationRef.current);
-          if (realResults && realResults.length > 0) {
-            setLeadsData(realResults);
-            setSelectedIds(realResults.map((r) => r.id));
-            setHasScrapped(true);
-            setScrapeFailed(false);
-            setIsScraping(false);
-            setToast({
-              show: true,
-              type: "success",
-              message: `🎉 Extracted ${realResults.length} real places in ${locationRef.current || 'location'}!`
-            });
-            setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
-          }
-        }
-        return;
-      }
-
+    // A new listing arrived from backend stream — preserve it immediately!
+    socket.on("scrape_lead", (lead) => {
+      if (!lead || !lead.name) return;
       setLeadsData((prev) => {
-        const cleaned = prev.filter((p) => !isFakeLead(p));
-        if (cleaned.some((l) => l.id === lead.id || l.name.toLowerCase() === lead.name.toLowerCase())) return cleaned;
-        return [...cleaned, lead];
+        if (prev.some((l) => l.id === lead.id || l.name.toLowerCase() === lead.name.toLowerCase())) return prev;
+        return [...prev, lead];
       });
       setSelectedIds((prev) =>
         prev.includes(lead.id) ? prev : [...prev, lead.id] // auto-select
@@ -137,54 +120,31 @@ export default function WebScraper() {
     });
 
     // All listings collected and phones resolved
-    socket.on("scrape_complete", async ({ count }) => {
+    socket.on("scrape_complete", ({ count }) => {
       setIsScraping(false);
       setHasScrapped(true);
-
-      setLeadsData((currentLeads) => {
-        const valid = currentLeads.filter((l) => !isFakeLead(l));
-        if (valid.length === 0 && !realDirectoryTriggeredRef.current) {
-          realDirectoryTriggeredRef.current = true;
-          fetchRealDirectoryLeads(queryRef.current, locationRef.current).then((realResults) => {
-            if (realResults && realResults.length > 0) {
-              setLeadsData(realResults);
-              setSelectedIds(realResults.map((r) => r.id));
-              setScrapeFailed(false);
-              setToast({
-                show: true,
-                type: "success",
-                message: `🎉 Extracted ${realResults.length} real places in ${locationRef.current || 'location'}!`
-              });
-              setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
-            }
-          });
-        }
-        return valid;
-      });
-
       setScrapeFailed(false);
       setToast({
         show: true,
         type: "success",
-        message: `🎉 Scraping complete!`
+        message: `🎉 Scraping complete! Extracted ${count || leadsDataRef.current.length} listings.`
       });
       setTimeout(() => setToast({ show: false, type: "", message: "" }), 4000);
     });
 
-    // Error from backend — seamlessly invoke Real Directory AI
+    // Error from backend — NEVER discard already scraped leads!
     socket.on("scrape_error", async ({ message }) => {
       console.warn("⚠️ [WebScraper] Background stream ended:", message);
-      // If leads are already successfully extracted, keep status as complete!
-      setLeadsData((currentLeads) => {
-        if (currentLeads.length > 0) {
-          setIsScraping(false);
-          setHasScrapped(true);
-          setScrapeFailed(false);
-          return currentLeads;
-        }
-        return currentLeads;
-      });
+      setIsScraping(false);
+      setHasScrapped(true);
 
+      // If leads were already successfully extracted during the stream, keep them!
+      if (leadsDataRef.current.length > 0) {
+        setScrapeFailed(false);
+        return;
+      }
+
+      // ONLY if ZERO leads arrived, try client-side directory fallback
       if (!realDirectoryTriggeredRef.current) {
         realDirectoryTriggeredRef.current = true;
         const realResults = await fetchRealDirectoryLeads(queryRef.current, locationRef.current);
@@ -193,7 +153,6 @@ export default function WebScraper() {
           setSelectedIds(realResults.map((r) => r.id));
           setHasScrapped(true);
           setScrapeFailed(false);
-          setIsScraping(false);
           setToast({
             show: true,
             type: "success",
@@ -203,9 +162,7 @@ export default function WebScraper() {
           return;
         }
       }
-      setIsScraping(false);
-      setHasScrapped(true);
-      setScrapeFailed((prev) => (queryRef.current ? false : true));
+      setScrapeFailed(leadsDataRef.current.length === 0);
     });
 
     return () => socket.disconnect();

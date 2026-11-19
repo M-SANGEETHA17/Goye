@@ -1411,6 +1411,7 @@ io.on("connection", (socket) => {
 
         console.log(`🕷️ [WebScraper] Starting scrape for query: "${query}", location: "${location || ""}"`);
 
+        let completed = false;
         try {
             await scrapeGoogleMapsLeads(query, location, {
                 isPaused: () => !!(socket.scrapeState && socket.scrapeState.isPaused),
@@ -1437,12 +1438,15 @@ io.on("connection", (socket) => {
                     socket.emit("scrape_phone_update", { id, phone });
                 },
                 onComplete: (leads) => {
+                    completed = true;
                     socket.emit("scrape_complete", { count: leads.length });
                 }
             });
         } catch (err) {
             console.error("❌ Web Scraper error:", err);
-            socket.emit("scrape_error", { message: err.message || "Failed to scrape listings." });
+            if (!completed) {
+                socket.emit("scrape_error", { message: err.message || "Failed to scrape listings." });
+            }
         }
     });
 
