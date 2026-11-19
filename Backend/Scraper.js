@@ -651,6 +651,10 @@ Output ONLY valid JSON.`;
 
     const isSchool = /school|vidyalaya|academy|matric|education|college|university|institute/i.test(searchQuery);
     const isGym = /gym|fitness|workout|crossfit|bodybuilding/i.test(searchQuery);
+    const isBakery = /bakery|bakes|cake|sweet|pastry|bread/i.test(searchQuery);
+    const isBoutique = /boutique|tailor|textile|clothing|dress|fashion|designer|saree/i.test(searchQuery);
+    const isSupermarket = /supermarket|grocery|mart|provision|store|hypermarket/i.test(searchQuery);
+    const isCafe = /coffee|tea|cafe|restaurant|hotel|bhavan|mess|dining/i.test(searchQuery);
 
     const curatedList = isSchool ? BACKEND_VERIFIED[locKey] : null;
     if (curatedList && curatedList.length > 0) {
@@ -673,7 +677,129 @@ Output ONLY valid JSON.`;
           "Spartan Fitness & Gym",
           "Gold's Fitness Gym",
           "Champion Health Club & Gym",
-          "Titan Fitness Studio"
+          "Titan Fitness Studio",
+          "Alpha Gym & CrossFit",
+          "Bodyline Fitness Center",
+          "ProFit Unisex Gym",
+          "V-Fitness Studio",
+          "Evolution Gym & Wellness",
+          "Maximus Fitness Center",
+          "Pulse Gym & Fitness",
+          "Steel Body Gym",
+          "Optimum Health & Gym",
+          "Velocity Fitness Arena"
+        ];
+      } else if (isBakery) {
+        placeTemplates = [
+          "Iyengar Bakery & Sweets",
+          "Sri Krishna Sweets & Bakery",
+          "Crown Bakery & Cake Shop",
+          "Daily Fresh Bakery & Confectionery",
+          "Winner Bakery",
+          "Cake Point & Bakery",
+          "Hot Breads & Cafe",
+          "Royal Bakery & Sweets",
+          "Sri Murugan Bakery",
+          "Golden Bakery & Snacks",
+          "Bread Basket Bakery",
+          "Bake World Cake Shop",
+          "Cream & Fudge Bakery",
+          "Sweet Treats & Bakery",
+          "Cakes & Bakes Studio",
+          "Sri Lakshmi Sweets & Bakery",
+          "Classic Bakeries & Confectionery",
+          "Delight Cake & Bakery",
+          "Modern Bakery & Sweets",
+          "Anand Bakery & Tea Stall",
+          "Baker's Pride & Confectionery",
+          "Fresh Oven Bakery",
+          "Paris Bakery & Sweets",
+          "Sri Balaji Sweets & Bakery",
+          "Cake Zone Pastry Shop"
+        ];
+      } else if (isBoutique) {
+        placeTemplates = [
+          "Sri Lakshmi Designer Boutique",
+          "Trendz Ladies Boutique & Tailoring",
+          "Meena Fashion Boutique",
+          "Sri Ganesh Silks & Boutique",
+          "Style Icon Fashion Studio",
+          "Kavitha Designer Studio & Tailors",
+          "Elegance Women's Boutique",
+          "Mahaveer Textiles & Boutique",
+          "Ananya Bridal Boutique",
+          "Royal Heritage Silk & Boutique",
+          "Samyuktha Boutique & Couture",
+          "Pragathi Designer Lounge",
+          "Classic Cut Boutique & Tailoring",
+          "Shree Fashion & Bridal Boutique",
+          "Radha Silk House & Boutique",
+          "Divya Fashion Hub",
+          "Velan Silks & Sarees",
+          "Srinidhi Boutique & Stitching Center",
+          "Lotus Women's Boutique",
+          "Parijatham Designer Store",
+          "Nandhini Fashion Boutique",
+          "Colors Designer Studio",
+          "Sri Amman Boutique & Matching Center",
+          "Glamour Women's Wear & Boutique",
+          "Kanmani Aari Works & Boutique"
+        ];
+      } else if (isSupermarket) {
+        placeTemplates = [
+          "Nilgiris Supermarket",
+          "Reliance Smart Superstore",
+          "More Supermarket",
+          "Sri Murugan Supermarket",
+          "Ponmani Supermarket & Departmental Store",
+          "Daily Fresh Mart",
+          "Kannan Jubilee Supermarket",
+          "Subhiksha Departmental Stores",
+          "City Supermarket",
+          "Sri Balaji Provision & Supermarket",
+          "Metro Super Bazaar",
+          "Green Mart Supermarket",
+          "Family Supermarket & Grocery",
+          "Star Bazaar & Mart",
+          "Sri Lakshmi Departmental Store",
+          "Prime Supermarket",
+          "Heritage Daily Fresh Supermarket",
+          "Grand Mart Supermarket",
+          "Town Supermarket & Provisions",
+          "Choice Supermarket",
+          "Amman Supermarket",
+          "Fresh Basket Grocery Mart",
+          "National Supermarket",
+          "Smart Value Departmental Store",
+          "Supreme Supermarket"
+        ];
+      } else if (isCafe) {
+        placeTemplates = [
+          "Kumbakonam Degree Coffee",
+          "Sri Saravana Bhavan Hotel & Cafe",
+          "Madras Coffee House",
+          "Sri Aaryas Restaurant & Coffee Bar",
+          "Aavin Parlour & Cafe",
+          "Cafe Coffee Break",
+          "Tea Time & Snacks Bar",
+          "Hotel Anandha Bhavan",
+          "Anjappar Chettinad Restaurant",
+          "Mani's Cafe & Tiffin Center",
+          "Green Leaf Vegetarian Cafe",
+          "The Brew Room Cafe",
+          "Sree Krishna Bhavan",
+          "Chai Galli & Snacks",
+          "City Corner Coffee & Tea",
+          "Royal Cafe & Bakery",
+          "Madurai Famous Jigarthanda & Cafe",
+          "Hotel Gowri Krishna",
+          "Filter Coffee Express",
+          "Classic Tea & Tiffin House",
+          "Sri Balaji Bhavan & Cafe",
+          "Udupi Tiffin Center & Coffee",
+          "Cafe Mocha Express",
+          "Relax Tea Stall & Snacks",
+          "Aroma Coffee Lounge"
         ];
       } else if (isSchool) {
         placeTemplates = [
