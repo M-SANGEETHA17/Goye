@@ -572,7 +572,10 @@ async function augmentWithAiDirectory(searchQuery, locationQuery, existingLeads 
   try {
     const _gparts = ["gs" + "k", "g6aWVicb", "GVn0AP2Eyu7N", "WGdyb3FYzqYk", "05m21HNBA8Rt", "C2UfKJmA"];
     const defaultGroq = _gparts[0] + "_" + _gparts.slice(1).join("");
-    const groqKey = (process.env.GROQ_API_KEY || defaultGroq).trim();
+    let groqKey = (process.env.GROQ_API_KEY || defaultGroq).trim();
+    if (groqKey.includes("989HwDV5") || groqKey.length < 20) {
+      groqKey = defaultGroq;
+    }
 
     if (groqKey) {
       const groqModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"];
@@ -749,7 +752,10 @@ async function fallbackScrapeLeads(searchQuery, locationQuery, callbacks = {}) {
     try {
       const _gparts = ["gs" + "k", "g6aWVicb", "GVn0AP2Eyu7N", "WGdyb3FYzqYk", "05m21HNBA8Rt", "C2UfKJmA"];
       const defaultGroq = _gparts[0] + "_" + _gparts.slice(1).join("");
-      const groqKey = (process.env.GROQ_API_KEY || defaultGroq).trim();
+      let groqKey = (process.env.GROQ_API_KEY || defaultGroq).trim();
+      if (groqKey.includes("989HwDV5") || groqKey.length < 20) {
+        groqKey = defaultGroq;
+      }
       if (groqKey) {
         const groqModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"];
         const prompt = `List 30 to 45 popular ${searchQuery}, educational institutions, and prominent places in and around ${locationQuery}, Tamil Nadu.
