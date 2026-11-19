@@ -8,6 +8,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend
 } from "recharts";
+import { API_BASE_URL } from "../config";
 
 export default function GoyeAdminDashboard() {
   const navigate = useNavigate();
@@ -30,8 +31,8 @@ export default function GoyeAdminDashboard() {
       isFetching = true;
       try {
         const [userRes, msgRes] = await Promise.all([
-          fetch("https://goye-backend-bw8t.onrender.com/api/users").catch(() => null),
-          fetch("https://goye-backend-bw8t.onrender.com/api/messages/stats").catch(() => null)
+          fetch(`${API_BASE_URL}/api/users`).catch(() => null),
+          fetch(`${API_BASE_URL}/api/messages/stats`).catch(() => null)
         ]);
         
         if (userRes && userRes.ok) {

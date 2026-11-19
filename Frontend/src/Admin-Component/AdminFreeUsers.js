@@ -5,8 +5,7 @@ import {
   Clock, Sparkles, X, RefreshCw, ShieldCheck, ArrowUpRight, MoreVertical 
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
-
-const API_BASE_URL = (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com").replace(/\/+$/, "");
+import { API_BASE_URL } from "../config";
 
 export default function AdminFreeUsers() {
   const [freeUsers, setFreeUsers] = useState(() => {
