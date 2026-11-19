@@ -166,6 +166,13 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
 
   console.log(`🔍 [Scraper] Fetching REAL Google Maps data for: "${fullQuery}"`);
 
+  // ── State tracking (scoped outside try so catch & workers have full access) ──
+  const seenNames = new Set();
+  const allLeads = [];
+  let idCounter = 1;
+  const phoneQueue = [];
+  let scrollingDone = false;
+
   let browser;
   try {
     browser = await chromium.launch({
@@ -249,15 +256,6 @@ async function scrapeGoogleMapsLeads(searchQuery, locationQuery, callbacks = {})
     if (firstBatch.length > 0) {
       console.log(`⚡ [Fast First Pass] Emitted ${firstBatch.length} listings immediately to socket!`);
     }
-
-    // ── State tracking ──────────────────────────────────────────────────────
-    const seenNames = new Set();
-    const allLeads = [];
-    let idCounter = 1;
-
-    // Phone extraction queue — filled as listings are discovered
-    const phoneQueue = [];
-    let scrollingDone = false;
 
     // ── Concurrent phone extraction worker ──────────────────────────────────
     // Runs in background while scrolling continues; 2 tabs at a time for stable cloud hosting memory.
