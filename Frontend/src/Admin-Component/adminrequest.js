@@ -10,7 +10,7 @@ import {
 const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_BASE_URL = (
   process.env.REACT_APP_API_URL ||
-  (isLocalHost ? 'http://localhost:5000' : 'https://goye-backend-bw8t.onrender.com')
+  (isLocalHost ? 'http://localhost:5000' : 'https://goyeorg-mije.onrender.com')
 ).replace(/\/+$/, "");
 
 const getPlanMeta = (planName = '') => {
@@ -82,7 +82,7 @@ export default function SubscriptionRequests() {
       let res = await fetch(`${API_BASE_URL}/api/subscription-requests/${id}/screenshot`).catch(() => null);
       if (!res || !res.ok) {
         const altUrl = API_BASE_URL.includes('localhost') 
-          ? 'https://goye-backend-bw8t.onrender.com' 
+          ? 'https://goyeorg-mije.onrender.com' 
           : 'http://localhost:5000';
         res = await fetch(`${altUrl}/api/subscription-requests/${id}/screenshot`).catch(() => null);
       }
@@ -130,7 +130,7 @@ export default function SubscriptionRequests() {
       let response = await fetch(`${API_BASE_URL}/api/subscription-requests`).catch(() => null);
       if (!response || !response.ok) {
         const altUrl = API_BASE_URL.includes('localhost') 
-          ? 'https://goye-backend-bw8t.onrender.com' 
+          ? 'https://goyeorg-mije.onrender.com' 
           : 'http://localhost:5000';
         response = await fetch(`${altUrl}/api/subscription-requests`).catch(() => null);
       }
@@ -177,7 +177,7 @@ export default function SubscriptionRequests() {
       }).catch(() => null);
       if (!response || !response.ok) {
         const altUrl = API_BASE_URL.includes('localhost') 
-          ? 'https://goye-backend-bw8t.onrender.com' 
+          ? 'https://goyeorg-mije.onrender.com' 
           : 'http://localhost:5000';
         response = await fetch(`${altUrl}/api/subscription-requests/${id}`, {
           method: 'PUT',

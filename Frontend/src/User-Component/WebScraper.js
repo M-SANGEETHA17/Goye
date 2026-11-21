@@ -78,7 +78,7 @@ export default function WebScraper() {
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
     const socketUrl = isLocal
       ? "http://localhost:5000"
-      : (process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com");
+      : (process.env.REACT_APP_API_URL || "https://goyeorg-mije.onrender.com");
 
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"],
@@ -318,7 +318,7 @@ export default function WebScraper() {
         window.location.hostname === "localhost" || 
         window.location.hostname === "127.0.0.1"
       );
-      const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
+      const apiBase = process.env.REACT_APP_API_URL || "https://goyeorg-mije.onrender.com";
       const localUrl = isLocal ? "http://localhost:5000" : apiBase;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 40000);

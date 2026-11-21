@@ -106,7 +106,7 @@ export default function SocialExtractor() {
       window.location.hostname === "localhost" || 
       window.location.hostname === "127.0.0.1"
     );
-    const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
+    const apiBase = process.env.REACT_APP_API_URL || "https://goyeorg-mije.onrender.com";
     const socketUrl = isLocal ? "http://localhost:5000" : apiBase;
 
     const socket = io(socketUrl, {
@@ -341,7 +341,7 @@ export default function SocialExtractor() {
           window.location.hostname === "localhost" || 
           window.location.hostname === "127.0.0.1"
         );
-        const apiBase = process.env.REACT_APP_API_URL || "https://goye-backend-bw8t.onrender.com";
+        const apiBase = process.env.REACT_APP_API_URL || "https://goyeorg-mije.onrender.com";
         const localUrl = isLocal ? "http://localhost:5000" : apiBase;
         const scrapeRes = await fetch(`${localUrl}/api/scrape-leads`, {
           method: "POST",
