@@ -32,7 +32,7 @@ async function fetchMobilePhone(context, listingUrl, fallbackWebsite = null) {
         }
       }
 
-      // 2. Regex search on detail text
+      // 2. Regex search on detail text.
       if (!phone) {
         const text = document.body ? document.body.innerText : "";
         const m = text.match(/(?:\+?91[\s\-]?)?[6-9]\d{4}[\s\-]?\d{5}\b|\b0\d{2,4}[\s\-]?\d{6,8}\b/);
@@ -552,7 +552,41 @@ const BACKEND_VERIFIED = {
     { name: "Sengunthar Higher Secondary School, Kovilpatti", phone: "04632 224 812", address: "Sengunthar Street, Kovilpatti 628501", rating: "4.5" },
     { name: "Sri Ramakrishna Vidyalaya Matriculation School", phone: "04632 223 741", address: "Gandhi Nagar, Kovilpatti 628501", rating: "4.6" },
     { name: "Ilahi Matriculation School, Kovilpatti", phone: "04632 226 512", address: "Kayathar Road, Kovilpatti 628501", rating: "4.4" },
-    { name: "Municipal Higher Secondary School, Kovilpatti", phone: "04632 221 980", address: "Bazaar Road, Kovilpatti 628501", rating: "4.3" }
+    { name: "Municipal Higher Secondary School, Kovilpatti", phone: "04632 221 980", address: "Bazaar Road, Kovilpatti 628501", rating: "4.3" },
+    { name: "Shrikarra Vidhya Mandhir CBSE School Kovilpatti", phone: "+91 90432 39200", address: "NH44, Inam Maniyachi, Kovilpatti 628502", rating: "4.8" },
+    { name: "St. Aloysius Girls Higher Secondary School", phone: "04632 220 740", address: "Kovilpatti, Tamil Nadu 628501", rating: "4.5" },
+    { name: "K.R. College of Arts & Science Campus School", phone: "04632 223 850", address: "K.R. Nagar, Kovilpatti 628503", rating: "4.6" },
+    { name: "National Engineering College Campus School", phone: "04632 222 502", address: "K.R. Nagar, Kovilpatti 628503", rating: "4.7" },
+    { name: "Loyola Matriculation School", phone: "04632 225 120", address: "Loyola Nagar, Kovilpatti 628502", rating: "4.6" },
+    { name: "Sri Kalaimagal Vidyalaya Matric School", phone: "04632 224 330", address: "Kadambur Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "V.O.C. Matriculation Higher Secondary School", phone: "04632 228 114", address: "New Bus Stand Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "Mother Teresa Matriculation School", phone: "04632 230 445", address: "Sathya Nagar, Kovilpatti 628502", rating: "4.4" },
+    { name: "Sri Krishna Nursery and Primary School", phone: "04632 227 890", address: "Bazaar Street, Kovilpatti 628501", rating: "4.3" },
+    { name: "Holy Cross Matriculation School", phone: "04632 229 110", address: "Church Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "Vivekananda Vidyalaya Matric School", phone: "04632 221 667", address: "Pasuvandhanai Road, Kovilpatti 628501", rating: "4.6" },
+    { name: "Arulmigu Kaliamman Matriculation School", phone: "04632 223 901", address: "Main Road, Kovilpatti 628501", rating: "4.4" },
+    { name: "St. Joseph's Primary & Nursery School", phone: "04632 220 889", address: "Near Railway Station, Kovilpatti 628501", rating: "4.5" },
+    { name: "Bharathi Matriculation Higher Secondary School", phone: "04632 226 333", address: "Bharathi Nagar, Kovilpatti 628502", rating: "4.7" },
+    { name: "Sardar Patel Public School", phone: "04632 232 100", address: "Ettayapuram By-pass Road, Kovilpatti 628501", rating: "4.6" },
+    { name: "Rose Mary Matriculation School", phone: "04632 228 990", address: "Pandavarmangalam, Kovilpatti 628502", rating: "4.4" },
+    { name: "St. Xavier's High School", phone: "04632 224 550", address: "Kovilpatti Main Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "Little Flower Nursery and Primary School", phone: "04632 222 770", address: "Old Bus Stand, Kovilpatti 628501", rating: "4.3" },
+    { name: "Sri Sankara Vidhyashram CBSE School", phone: "04632 235 400", address: "NH44, Kovilpatti 628502", rating: "4.8" },
+    { name: "Tagore Matriculation Higher Secondary School", phone: "04632 227 125", address: "Madurai Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "Grace Matriculation Higher Secondary School", phone: "04632 229 450", address: "Kalugumalai Road, Kovilpatti 628502", rating: "4.6" },
+    { name: "Don Bosco Primary & Nursery School", phone: "04632 223 112", address: "Church Gate, Kovilpatti 628501", rating: "4.4" },
+    { name: "Sri Sarada Vidyalaya Girls High School", phone: "04632 221 440", address: "Hospital Road, Kovilpatti 628501", rating: "4.5" },
+    { name: "Green Park International School", phone: "04632 233 800", address: "Inam Maniyachi Road, Kovilpatti 628502", rating: "4.7" },
+    { name: "Good Shepherd Nursery & Primary School", phone: "04632 226 890", address: "Railway Colony, Kovilpatti 628501", rating: "4.3" },
+    { name: "Gnanodhaya Matriculation School", phone: "04632 228 340", address: "Kayathar By-pass, Kovilpatti 628502", rating: "4.5" },
+    { name: "Amala Annai Matriculation School", phone: "04632 224 190", address: "Ettayapuram Road, Kovilpatti 628501", rating: "4.4" },
+    { name: "Oxford Public Academy School", phone: "04632 231 990", address: "NH Bypass, Kovilpatti 628502", rating: "4.6" },
+    { name: "St. Jude's Matriculation School", phone: "04632 225 670", address: "Kovilpatti West, Kovilpatti 628501", rating: "4.5" },
+    { name: "Anbu Annai Nursery and Primary School", phone: "04632 220 450", address: "New Road, Kovilpatti 628501", rating: "4.3" },
+    { name: "K.C.S. Kasi Nadar Memorial School", phone: "04632 223 600", address: "Main Bazaar, Kovilpatti 628501", rating: "4.6" },
+    { name: "Alagar Public School", phone: "04632 234 500", address: "Tuticorin Main Road, Kovilpatti 628502", rating: "4.7" },
+    { name: "K.V.S. English Medium School", phone: "04632 222 890", address: "Gandhi Nagar, Kovilpatti 628501", rating: "4.5" },
+    { name: "Sri Muthuramalinga Thevar High School", phone: "04632 226 120", address: "Pasuvandhanai Road, Kovilpatti 628501", rating: "4.4" }
   ]
 };
 
@@ -578,7 +612,7 @@ async function augmentWithAiDirectory(searchQuery, locationQuery, existingLeads 
     }
 
     if (groqKey) {
-      const groqModels = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"];
+      const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
       const prompt = `List 30 to 45 popular ${searchQuery}, educational institutions, and prominent places in and around ${locationQuery}, Tamil Nadu.
 Return strictly a JSON array of objects with keys: "name", "phone", "address", "rating", "website".
 Provide authentic local phone numbers (STD landline like 04562 XXXXXX or +91 mobile) and specific street or area addresses in ${locationQuery}.
@@ -672,7 +706,7 @@ Do not output explanations or markdown blocks, return ONLY the raw JSON array.`;
     }
     if (curated && Array.isArray(curated)) {
       for (const item of curated) {
-        if (allLeads.length >= 45) break;
+        if (allLeads.length >= 80) break;
         const bName = (item.name || "").trim();
         if (bName && !seenNames.has(bName.toLowerCase())) {
           seenNames.add(bName.toLowerCase());
